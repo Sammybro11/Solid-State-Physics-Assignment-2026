@@ -1,0 +1,25 @@
+version = 1
+revision = 3
+requires-python = ">=3.14"
+
+[manifest]
+members = [
+    "magpenetration-simulation",
+    "ssp-assignment-2026",
+    "xrd-simulation",
+]
+
+[[package]]
+name = "magpenetration-simulation"
+version = "0.1.0"
+source = { editable = "MagPenetration_Simulation" }
+
+[[package]]
+name = "ssp-assignment-2026"
+version = "0.1.0"
+source = { virtual = "." }
+
+[[package]]
+name = "xrd-simulation"
+version = "0.1.0"
+source = { editable = "XRD_Simulation" }
