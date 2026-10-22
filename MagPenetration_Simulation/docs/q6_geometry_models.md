@@ -2,7 +2,7 @@
 
 This report answers issue 3 with the usable geometry models.
 Each entry gives the solution, the assumptions, the valid range, and the failure modes.
-The last two sections guide the plots of issue 5 and the interface of issue 6.
+The last two sections guide the plots of plan item 6.5 and the interface of plan item 6.6.
 
 ## Shared framework
 
@@ -247,7 +247,7 @@ The current decays only like $1/r$ out to the Pearl length.
 
 For a parallel field, the 1D slab profile remains exact at every thickness.
 For a perpendicular field, the demagnetizing factor approaches 1.
-Then the mean field in the film barely drops, and the currents spread over $\Lambda$.
+The screening currents then spread over $\Lambda$, and the field concentrates at the film edge.
 
 ## Comparison table
 
@@ -259,7 +259,7 @@ Then the mean field in the film barely drops, and the currents spread over $\Lam
 | Box, rectangle, disk | finite body | vector London form | none | local London | numeric only | needs the outside field |
 | Thin film | film thickness $d$ | Pearl model | none | thin limit | $d < 2\lambda$ | $\Lambda = 2\lambda^2/d$ replaces $\lambda$ |
 
-## Guidance for the plots of issue 5
+## Guidance for the plots (plan item 6.5)
 
 - Draw the slab profile with the full cosh form at every $d/\lambda$.
   The exponential $B_0 e^{-s/\lambda}$ is a dashed thick-limit reference only.
@@ -279,7 +279,7 @@ Then the mean field in the film barely drops, and the currents spread over $\Lam
 - Mark the valid zone on rectangle maps.
   The 1D midplane profile applies several $\lambda$ away from an edge.
 
-## Guidance for the interface of issue 6
+## Guidance for the interface (plan item 6.6)
 
 - Provide sliders for $T$, $\lambda_0$, $B_0$, the geometry, and $d$ or $R$.
 - Update $\lambda$ from the two-fluid form above, and show the value in nm.
@@ -294,9 +294,9 @@ Then the mean field in the film barely drops, and the currents spread over $\Lam
 Issue 3 calls for a list of usable geometry models with caveats.
 The list below states each family and its limits.
 
-- The 1D slab gives the closed form of issue 6.2.
+- The 1D slab gives the closed form of plan item 6.2.
   It needs a parallel field and faces wider than $\lambda$.
-- The axial cylinder gives the Bessel form of issue 6.3.
+- The axial cylinder gives the Bessel form of plan item 6.3.
   It remains exact at every radius.
   Transverse fields and finite lengths need extra work.
 - The sphere has an exact London solution, and this report states it in full.
