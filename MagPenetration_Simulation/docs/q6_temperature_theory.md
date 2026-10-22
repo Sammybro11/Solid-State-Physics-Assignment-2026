@@ -69,7 +69,7 @@ Ampère's law turns this relation into a field equation inside the metal [4], [6
 
 $$\nabla^2 \mathbf{B} = \frac{1}{\lambda^2}\,\mathbf{B}, \qquad \lambda^2 = \frac{m}{\mu_0 n_s e^2}$$
 
-The depth $\lambda$ is the sole length in the steady state.
+The depth $\lambda$ is the length scale in the steady state.
 The two-fluid law gives $n_s(T) = n\,[1 - (T/T_c)^4]$.
 One substitution then produces the temperature dependence:
 
