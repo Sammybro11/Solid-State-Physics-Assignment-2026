@@ -13,7 +13,7 @@ position $x$. It must expose the penetration depth $\lambda$ as the length
 over which $B$ falls from the boundary value toward zero. It must also show
 the temperature dependence of $\lambda$ and the contrast between the slab
 and cylinder geometries. Every technique below must reproduce the same
-analytic answer. The techniques are direct evaluation, finite
+analytic answer. The report covers direct evaluation, finite
 differences, relaxation, and shooting.
 
 ## 2. Physics recap
