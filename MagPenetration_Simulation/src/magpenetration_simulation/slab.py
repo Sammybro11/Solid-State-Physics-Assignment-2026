@@ -162,8 +162,8 @@ def slab_field_relaxation(d, lam, b0, n_points, tol=1e-10, max_sweeps=10000):
     omega = 2.0 / (1.0 + np.sqrt(1.0 - rho**2))
 
     b = np.ones(n_points)
-    red = np.arange(1, n_points - 1, 2)
-    black = np.arange(2, n_points - 1, 2)
+    red = np.arange(1, n_points - 1, 2) # odd indices
+    black = np.arange(2, n_points - 1, 2) # even indices
 
     for sweep in range(1, max_sweeps + 1):
         old = b.copy()
@@ -177,3 +177,65 @@ def slab_field_relaxation(d, lam, b0, n_points, tol=1e-10, max_sweeps=10000):
         f"relaxation did not converge in {max_sweeps} sweeps "
         f"(last change {change:.2e}, tol {tol:.0e})")
 
+
+def _london_rhs(xt, y):
+    """Right-hand side of the dimensionless slab equation.
+
+    With y = [B/b0, d(B/b0)/d(x/lam)], the equation d2y/dxt2 = y
+    becomes the first-order pair dy0/dxt = y1, dy1/dxt = y0.
+    """
+    return [y[1], y[0]]
+
+
+def slab_field_shooting(d, lam, b0, n_points=401, tol=1e-10):
+    """Solve the slab field by linear shooting from the slab centre.
+
+    By symmetry dB/dx = 0 at x = 0, so the only unknown starting value
+    is B(0). The equation is linear, so one integration from
+    B(0) = 1, dB/dx(0) = 0 out to the face, followed by division by
+    the face value, gives the exact correction in a single shot. The
+    right half is then mirrored onto the left half of the shared grid.
+    Starting from the centre keeps the growing exp(x/lam) part of the
+    solution from swamping the answer; the techniques document shot
+    from the left face, which fails for d/lam above about 20. This
+    version holds to d/lam of about 1400, beyond that the unnormalized
+    solution, which grows like cosh(x/lam), overflows before the
+    division and solve_ivp fails with a RuntimeError.
+
+    Parameters
+    ----------
+    d : float
+        Slab thickness in m.
+    lam : float
+        London penetration depth in m.
+    b0 : float
+        Applied field at both faces in T.
+    n_points : int, optional
+        Number of grid points, odd and at least 3.
+    tol : float, optional
+        Relative tolerance passed to scipy.integrate.solve_ivp.
+
+    Returns
+    -------
+    x : numpy.ndarray
+        Positions in m, shape (n_points,).
+    b : numpy.ndarray
+        Field in T, shape (n_points,).
+
+    Raises
+    ------
+    RuntimeError
+        If the integrator reports a failure.
+    """
+    x = _grid(d, n_points)
+    mid = n_points // 2
+    xt_half = x[mid:] / lam
+
+    sol = solve_ivp(_london_rhs, (xt_half[0], xt_half[-1]), [1.0, 0.0],
+                    t_eval=xt_half, method="DOP853", rtol=tol, atol=tol * 1e-3) # DOP853 is scipy's high-order RK method, a better fit than the default for a tolerance as tight as 1e-10
+    if not sol.success:
+        raise RuntimeError(f"shooting integration failed: {sol.message}")
+
+    half = sol.y[0] / sol.y[0, -1]
+    b = np.concatenate((half[:0:-1], half))
+    return x, b0 * b
