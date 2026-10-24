@@ -1,7 +1,7 @@
 [project]
 name = "magpenetration-simulation"
 version = "0.1.0"
-description = "Add your description here"
+description = "London-equation models of magnetic-field penetration for a slab, a cylinder, a sphere, a finite body, and a film"
 readme = "README.md"
 authors = [
     { name = "Samyak", email = "srai890890@gmail.com" }
