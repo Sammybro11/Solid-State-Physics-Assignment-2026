@@ -106,6 +106,20 @@ The depth diverges with the exponent $-1/2$.
 The superfluid fraction vanishes, and the screening fails with it.
 At $T = T_c$ the formula has no value, and the exact limit is the uniform field $B(x) = B_0$.
 
+**The flat field at $T \ge T_c$.** At $T_c$ the superfluid density $n_s$ goes to zero.
+The London depth $\lambda$ then diverges.
+The London equation becomes $\nabla^2 \mathbf{B} = \mathbf{B}/\lambda^2 \to 0$.
+With the boundary values $B(\pm d/2) = B_0$, the solution is the uniform field $B(x) = B_0$.
+The screening current $\mathbf{J} = \nabla \times \mathbf{B}/\mu_0$ is then zero.
+The material is normal.
+In the static limit, a nonmagnetic normal metal has a uniform field inside.
+At $T_c$ the critical field $B_c(T)$ goes to zero, so any small $B_0$ destroys the superconducting state.
+The flat field is the normal-state limit that the toy model uses.
+A real normal metal in an AC field has a skin depth.
+This model is static, so it has no skin effect.
+A real sample near $T_c$ can have fluctuations and can enter a mixed state.
+A type-I sample can enter an intermediate state.
+
 **Why the model breaks in the critical region.** Both curves here are mean-field curves, the two-fluid fit and the Ginzburg-Landau curve [7].
 Mean-field theory ignores fluctuations of the order parameter.
 The fluctuations grow close to $T_c$.
@@ -201,6 +215,9 @@ def lambda_of_temperature(T, lambda0, Tc):
 ```
 
 The app maps an infinite depth to the limit $B(x) = B_0$, and the panel can then draw the exact flat profile at $T_c$.
+The flat branch is the normal-state limit of section 4.
+In that limit the superfluid density is zero.
+The London equation then reduces to $\nabla^2 \mathbf{B} = 0$, and the screening current is zero.
 
 **Guard 3: stabilize the cosh.**
 The argument $d/(2\lambda)$ can grow large.
