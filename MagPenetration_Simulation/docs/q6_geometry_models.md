@@ -212,7 +212,9 @@ A working numerical recipe follows:
 
 - Put the grid over the sample and its surroundings.
 - Write the London equation per Cartesian component with the five-point stencil.
-  The interior update reads $B = (B_E + B_W + B_N + B_S)/(4 - h^2/\lambda^2)$ in a 2D grid of step $h$.
+  The interior update reads $B = (B_E + B_W + B_N + B_S)/(4 + h^2/\lambda^2)$ in a 2D grid of step $h$.
+  The plus sign follows from $\nabla^2 B = B/\lambda^2$.
+  The minus sign makes the iteration diverge.
 - Sweep until the residual falls under the chosen tolerance.
   Successive over-relaxation accelerates the sweep.
 - Take the boundary data of the interior from the continuity conditions.
