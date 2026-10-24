@@ -157,6 +157,8 @@ Here $x$ is the distance from that face.
 A useful demo plots $B(x)/B_0$ against $x$ for several temperatures in one figure.
 The dip at the mid-plane fills in as $T$ rises.
 The field equals $B_0$ at both faces.
+The figure [`figures/temperature_lambda.png`](figures/temperature_lambda.png) plots $\lambda(T)$.
+The figure [`figures/temperature_profiles.png`](figures/temperature_profiles.png) plots the profile family.
 
 **Table 2** uses $\lambda_0 = 50$ nm, $T_c = 9.2$ K, and $d = 200$ nm.
 The probe depth is $\lambda_0 = 50$ nm below each face, halfway to the mid-plane.
@@ -193,26 +195,15 @@ The app needs four guards, so a dragged slider cannot break the plots.
 The denominator $1 - (T/T_c)^4$ hits zero at $T = T_c$.
 A scalar division then raises `ZeroDivisionError` in Python, and NumPy returns `inf` with a `RuntimeWarning`.
 The demo clamps the top of the $T$ slider to $0.995\,T_c$.
-At the clamp, $\lambda \approx 7.1\,\lambda_0$, or 355 nm for the default $\lambda_0 = 50$ nm.
-The center field is then about 96 % of $B_0$ at the default slab.
+At the clamp, $\lambda \approx 7.1\,\lambda_0$.
+For the default $\lambda_0 = 50$ nm, $\lambda$ at the clamp is 354.9 nm.
+The center field then gives $B(0)/B_0 = 0.9616$ at the default slab.
 
 **Guard 2: branch at $T \ge T_c$.**
-The function must handle the exact endpoint:
-
-```python
-import math
-
-def lambda_of_temperature(T, lambda0, Tc):
-    """London two-fluid law: lambda0 / sqrt(1 - (T/Tc)**4).
-
-    Returns float('inf') for T >= Tc, where the law has no value.
-    """
-    if Tc <= 0 or T < 0:
-        raise ValueError("T must lie in [0, Tc) and Tc must be positive")
-    if T >= Tc:
-        return float("inf")
-    return lambda0 / math.sqrt(1.0 - (T / Tc) ** 4)
-```
+The function `lambda_of_temperature` in
+[`temperature.py`](../src/magpenetration_simulation/temperature.py) does this branch.
+Its signature is `lambda_of_temperature(t, lambda_0, t_c)`.
+It returns `float("inf")` for `t >= t_c`, where the law has no value.
 
 The app maps an infinite depth to the limit $B(x) = B_0$, and the panel can then draw the exact flat profile at $T_c$.
 The flat branch is the normal-state limit of section 4.
@@ -257,6 +248,7 @@ Table 3 lists the ranges and defaults for the app of item 6.6:
 The defaults target niobium with $T_c = 9.2$ K.
 When the profile panel plots $B(x)/B_0$, the value of $B_0$ cancels.
 The $B_0$ slider then matters only for absolute-field plots.
+The normalized view in the app does not change when the user moves the $B_0$ slider.
 The $T_c$ range covers niobium and the cuprate scale.
 
 ## 7. Assumptions and Caveats
@@ -303,7 +295,16 @@ We connected the divergence at $T_c$ to mean-field theory and to the BCS gap [3]
 - We picked the slab of item 6.2 as the demonstration case.
 Table 2 comes from a plain-Python computation, and we cross-checked one row against the exponential estimate.
 - We designed the four guards, because a user can park the $T$ slider on $T_c$ exactly.
-- This report covers the theory only, and the code of item 6.4 will reuse the function of section 6.
+- [`temperature.py`](../src/magpenetration_simulation/temperature.py) now contains the model.
+Its `lambda_of_temperature(t, lambda_0, t_c)` function is the two-fluid law of section 2.
+- The Temperature tab in [`app.py`](../src/magpenetration_simulation/app.py) uses that module.
+The tab shows the sliders of Table 3 and the views of section 6.
+- [`scripts/make_figures.py`](../scripts/make_figures.py) writes the two temperature figures:
+[`figures/temperature_lambda.png`](figures/temperature_lambda.png) and
+[`figures/temperature_profiles.png`](figures/temperature_profiles.png).
+- The figure script checks the clamp values, and Guard 1 fixes the two numbers.
+The check holds `lambda` at the clamp to 354.9 nm and `B(0)/B_0` at the clamp to 0.9616.
+The script exits 1 when a value leaves its bound.
 
 In short: a rise in $T$ grows $\lambda$, and the growth weakens the screening at every interior point.
 The profile of $B(x)$ flattens toward $B_0$.
