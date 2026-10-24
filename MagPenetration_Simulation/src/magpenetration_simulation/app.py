@@ -206,10 +206,11 @@ def error_chart(r, shown, scale, units, t):
                          title="|B − B_analytic| / B₀" if units == "Scaled" else "|B − B_analytic| (µT)")
     else:
         fig.add_hline(y=0, line={"color": t["axis"], "width": 1})
-        fig.update_yaxes(exponentformat="power",
+        fig.update_yaxes(type="linear", autorange=True, range=None, dtick=None,
+                         exponentformat="power",
                          title="(B − B_analytic) / B₀" if units == "Scaled" else "B − B_analytic (µT)")
     fig.update_xaxes(title=x_title)
-    return style(fig, t, CHART_H, uirevision=f"error-{units}")
+    return style(fig, t, CHART_H, uirevision=f"error-{units}-{scale}")
 
 
 def lambda_chart(t_c, lambda_0_m, t_k, theme):
@@ -364,7 +365,8 @@ def live_chart(fig, key):
     Plotly.js is sent to the browser once per session, with the first chart.
     """
     data = {"figure": json.loads(fig.to_json()),
-            "config": {"displayModeBar": False, "responsive": True}}
+            "config": {"displayModeBar": True, "modeBarButtons": [["resetScale2d"]],
+                       "displaylogo": False, "responsive": True}}
     if not st.session_state.get("plotly_js_sent"):
         data["plotly_js"] = get_plotlyjs()
         st.session_state.plotly_js_sent = True
