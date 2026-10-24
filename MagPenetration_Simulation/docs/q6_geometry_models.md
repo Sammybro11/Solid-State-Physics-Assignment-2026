@@ -2,7 +2,8 @@
 
 This report answers issue 3 with the usable geometry models.
 Each entry gives the solution, the assumptions, the valid range, and the failure modes.
-The last two sections guide the plots of plan item 6.5 and the interface of plan item 6.6.
+The report also records the implemented cylinder slice and the page-based interface.
+Later sections cover the plot guidance, the interface, and the code that now exists.
 
 ## Shared framework
 
@@ -273,21 +274,59 @@ The screening currents then spread over $\Lambda$, and the field concentrates at
 - Keep boundary values above $B_0$ visible.
   Demagnetization raises the field just inside the boundary above $B_0$.
   The sphere equator gives $1.16 B_0$ for $R = 2.9\lambda$.
-- Do not compare geometries on one depth axis.
-  Plot every curve against the depth from the nearest face, in units of $\lambda$.
+- Do not compare geometries on the same $x/\lambda$ from a midplane.
+- Compare on $s/\lambda$, the depth from the nearest face.
   State the boundary value of every curve in the caption.
 - Mark the valid zone on rectangle maps.
   The 1D midplane profile applies several $\lambda$ away from an edge.
 
-## Guidance for the interface (plan item 6.6)
+## Implemented interface
 
-- Provide sliders for $T$, $\lambda_0$, $B_0$, the geometry, and $d$ or $R$.
-- Update $\lambda$ from the two-fluid form above, and show the value in nm.
-- Warn when $d < 2\lambda$, and show $\Lambda = 2\lambda^2/d$.
-- Warn when the user picks a rectangle or box geometry.
-  State the 1D limit of that map in the caption.
-- Keep units on every axis, and keep the normalization $B/B_0$ on every plot.
-- For geometry comparisons, plot $B/B_0$ against $s/\lambda$, and give the boundary value per curve.
+[`app.py`](../src/magpenetration_simulation/app.py) now holds the page shell.
+[`ui.py`](../src/magpenetration_simulation/ui.py) holds the header, the navigation bar, and the charts.
+
+- The header title is a button.
+  A click on the title returns to Theory.
+- The top navigation bar shows six pages.
+  The order is Theory, Methods, Slab, Cylinder, Combined, and Sphere.
+- The sidebar sets $T$, $T_c$, $\lambda_0$, and $B_0$, and it holds the normal-state toggle and the theme switch.
+- The slider stops at $0.995\,T_c$, so $\lambda(T)$ keeps a finite value.
+- Each page sets its own size, $d/\lambda$ or $R/\lambda$, and its own $N$.
+- The app has no Temperature tab.
+  The geometry pages take $\lambda(T)$ from the sidebar.
+- The Sphere page is a placeholder that states the exact vector formulas and computes no values.
+- The 2D field-line view and the field-magnitude view are a separate slice.
+
+The Slab page warns when $d < 2\lambda$ and shows $\Lambda = 2\lambda^2/d$.
+The Combined page plots $B/B_0$ against $s/\lambda$ for both closed forms.
+
+## Implemented cylinder slice
+
+[`cylinder.py`](../src/magpenetration_simulation/cylinder.py) provides four public functions.
+
+| Function | Result |
+|---|---|
+| `cylinder_field_analytic(r, radius, lam, b0)` | the field at $r$, $B_0 I_0(r/\lambda)/I_0(R/\lambda)$ |
+| `cylinder_field_profile(radius, lam, b0, n_points=401)` | the field on a grid from the axis to the wall |
+| `cylinder_center_field(radius, lam, b0)` | the axis value, $B_0/I_0(R/\lambda)$ |
+| `cylinder_mean_field(radius, lam, b0)` | the volume mean, $B_0 (2\lambda/R) I_1(R/\lambda)/I_0(R/\lambda)$ |
+
+The code evaluates the Bessel functions in the scaled form `i0e` and `i1e`.
+The scaled form multiplies by $e^{-x}$, so a large $R/\lambda$ cannot overflow.
+At $r = R$ the ratio and the exponent are exactly 1, so $B(R)/B_0 = 1$ to machine precision.
+
+The Cylinder page reads these functions through
+[`app.py`](../src/magpenetration_simulation/app.py).
+The smoke check writes [`figures/geometry_cylinder.png`](figures/geometry_cylinder.png) and
+[`figures/geometry_comparison.png`](figures/geometry_comparison.png) as well.
+
+The smoke check checks these values:
+
+- Cylinder at $R = 5\lambda$: center $0.0367109$, mean $0.357353$.
+- Cylinder at $R = 20\lambda$: center $2.29577 \times 10^{-8}$, mean $0.0974671$.
+- Slab at $d = 5\lambda$: center $0.163071$, mean $0.394646$.
+- Wall value $B(R)/B_0 = 1$ over the whole $R/\lambda$ family.
+- Near-wall form $\sqrt{R/r}\,e^{-s/\lambda}$ within $10^{-3}$ at $R = 20\lambda$ for $s/\lambda \le 2$.
 
 ## What was done and why
 
@@ -305,6 +344,12 @@ The list below states each family and its limits.
   Issue 6.5 can map the midplane profile, and the map must mark the edge zone where the profile fails.
 - Thin films cross into the Pearl regime below $d = 2\lambda$.
   The interface must switch the length scale to $\Lambda$ there.
+- The slab and the cylinder now have code.
+  [`slab.py`](../src/magpenetration_simulation/slab.py) provides three numerical solvers and the cosh form.
+  [`cylinder.py`](../src/magpenetration_simulation/cylinder.py) provides the Bessel form and its two scalars.
+- The report still covers the sphere and the finite bodies.
+  Neither has a solver yet.
+- The app has no 2D field map yet.
 
 Every closed form follows from the local London equation.
 The numeric path inherits the same limits.

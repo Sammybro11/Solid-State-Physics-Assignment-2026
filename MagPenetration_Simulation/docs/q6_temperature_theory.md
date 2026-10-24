@@ -297,8 +297,8 @@ Table 2 comes from a plain-Python computation, and we cross-checked one row agai
 - We designed the four guards, because a user can park the $T$ slider on $T_c$ exactly.
 - [`temperature.py`](../src/magpenetration_simulation/temperature.py) now contains the model.
 Its `lambda_of_temperature(t, lambda_0, t_c)` function is the two-fluid law of section 2.
-- The Temperature tab in [`app.py`](../src/magpenetration_simulation/app.py) uses that module.
-The tab shows the sliders of Table 3 and the views of section 6.
+- The app sidebar in [`app.py`](../src/magpenetration_simulation/app.py) sets $T$, $T_c$, $\lambda_0$, and $B_0$.
+The geometry pages take $\lambda(T)$ from that module and show the views of section 6.
 - [`scripts/make_figures.py`](../scripts/make_figures.py) writes the two temperature figures:
 [`figures/temperature_lambda.png`](figures/temperature_lambda.png) and
 [`figures/temperature_profiles.png`](figures/temperature_profiles.png).
