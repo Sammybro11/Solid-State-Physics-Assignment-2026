@@ -46,7 +46,9 @@ from magpenetration_simulation.slab import (
     slab_field_shooting,
 )
 from magpenetration_simulation.sphere import (
+    MU0,
     sphere_center_field,
+    sphere_dipole_moment,
     sphere_equator_field,
     sphere_mean_field,
     sphere_screening_factor,
@@ -57,6 +59,15 @@ from magpenetration_simulation.temperature import (
     lambda_curve,
     lambda_of_temperature,
     temperature_profile,
+)
+from magpenetration_simulation import ui_config as cfg
+from magpenetration_simulation.visualization import (
+    _cylinder_grid,
+    _cylinder_ratio,
+    _rect_grid,
+    _slab_grid,
+    _slab_ratio,
+    _sphere_grid,
 )
 
 # Agreed defaults (SI units)
@@ -356,6 +367,102 @@ def film_figure(path):
     plt.close(fig)
 
 
+def map_panel(ax, x, y, ratio, title, xlabel="x (nm)", ylabel="z (nm)"):
+    """|B|/B0 heatmap on the fixed 0..1.2 scale, equal axes in nm, no grid."""
+    im = ax.pcolormesh(x * 1e9, y * 1e9, ratio, cmap="RdBu_r", vmin=0.0, vmax=1.2, shading="auto")
+    ax.set_aspect("equal")
+    ax.set_xlabel(xlabel, fontsize=9)
+    ax.set_ylabel(ylabel, fontsize=9)
+    ax.tick_params(labelsize=8)
+    ax.set_title(title, fontsize=10)
+    return im
+
+
+def field_lines(ax, xs, ratio, y0, y1):
+    """Vertical field lines whose opacity follows the local B/B0."""
+    for x, o in zip(xs, ratio):
+        ax.vlines(x * 1e9, y0 * 1e9, y1 * 1e9, color="#f8fafc",
+                  alpha=float(np.clip(o, 0.08, 1.0)), lw=0.9)
+
+
+def field_maps_figure(path):
+    """2 x 3 static |B|/B0 maps at the common size d/(2 lambda) = R/lambda = SIZE."""
+    d = 2 * SIZE * LAM
+    radius = SIZE * LAM
+    fig, axes = plt.subplots(2, 3, figsize=(13.5, 8.6), layout="constrained")
+
+    xs, zs, ratio = _slab_grid(d, LAM, B0)
+    im = map_panel(axes[0, 0], xs, zs, ratio, "Slab (longitudinal)")
+    seeds = np.linspace(-0.75 * d, 0.75 * d, cfg.VIS["line_seeds"])
+    field_lines(axes[0, 0], seeds, _slab_ratio(seeds, d, LAM, B0), zs[0], zs[-1])
+    for face in (-d / 2, d / 2):  # the two faces only: a slab has no top or bottom edge
+        axes[0, 0].axvline(face * 1e9, color="#0f172a", lw=1.2)
+
+    rs, zs_c, ratio = _cylinder_grid(radius, LAM, B0)
+    map_panel(axes[0, 1], rs, zs_c, ratio, "Cylinder (longitudinal)", xlabel="r (nm)")
+    seeds = np.linspace(-1.3 * radius, 1.3 * radius, cfg.VIS["line_seeds"])
+    field_lines(axes[0, 1], seeds, _cylinder_ratio(seeds, radius, LAM, B0), zs_c[0], zs_c[-1])
+    for wall in (-radius, radius):
+        axes[0, 1].axvline(wall * 1e9, color="#0f172a", lw=1.2)
+
+    xs, zs, ratio = _sphere_grid(radius, LAM, B0)
+    map_panel(axes[0, 2], xs, zs, ratio, "Sphere (x-z)")
+    axes[0, 2].add_patch(plt.Circle((0.0, 0.0), radius * 1e9, fill=False, color="#0f172a", lw=1.2))
+
+    sol = rect_field_finite_difference(SIZE * LAM, SIZE * LAM, LAM, B0, nx=RECT_N, ny=RECT_N)
+    xr, yr, ratio = _rect_grid(sol, B0)
+    map_panel(axes[1, 0], xr, yr, ratio, "Finite body (x-y)", ylabel="y (nm)")
+    half = SIZE * LAM * 1e9 / 2
+    axes[1, 0].add_patch(plt.Rectangle((-half, -half), 2 * half, 2 * half,
+                                       fill=False, color="#0f172a", lw=1.2))
+    # the finite-body solver is scalar, so B is out of plane and there are no in-plane lines
+    axes[1, 0].text(0.03, 0.03, "B out of plane", transform=axes[1, 0].transAxes,
+                    fontsize=8, color="#0f172a")
+
+    xs, zs, ratio = _slab_grid(d, LAM, B0)  # the film is the slab model with d as its thickness
+    map_panel(axes[1, 1], xs, zs, ratio, "Film (longitudinal)")
+    seeds = np.linspace(-0.75 * d, 0.75 * d, cfg.VIS["line_seeds"])
+    field_lines(axes[1, 1], seeds, _slab_ratio(seeds, d, LAM, B0), zs[0], zs[-1])
+    for face in (-d / 2, d / 2):
+        axes[1, 1].axvline(face * 1e9, color="#0f172a", lw=1.2)
+
+    # The empty sixth cell holds the shared colour bar.
+    axes[1, 2].axis("off")
+    fig.colorbar(im, cax=axes[1, 2].inset_axes([0.42, 0.1, 0.16, 0.8]), label=r"$|B|/B_0$")
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+
+
+def sphere_field_lines_figure(path):
+    """Exterior field lines of the sphere in the x-z plane, clipped at r = R."""
+    radius = SIZE * LAM
+    xs, zs, ratio = _sphere_grid(radius, LAM, B0)
+    fig, ax = plt.subplots(figsize=(7, 6.4), layout="constrained")
+    im = ax.pcolormesh(xs * 1e9, zs * 1e9, ratio, cmap="RdBu_r", vmin=0.0, vmax=1.6, shading="auto")
+
+    xg, zg = np.meshgrid(xs, zs)
+    m = sphere_dipole_moment(radius, LAM, B0)
+    psi = 0.5 * B0 * xg**2 + (MU0 * m / (4 * np.pi)) * xg**2 / (xg**2 + zg**2)**1.5
+    # The interior London solution is a different potential, so only the exterior lines are drawn.
+    psi = np.ma.masked_where(np.hypot(xg, zg) < radius, psi)
+    ax.contour(xs * 1e9, zs * 1e9, psi, levels=18, colors="#1e3a8a", linewidths=0.8)
+
+    ax.add_patch(plt.Circle((0.0, 0.0), radius * 1e9, fill=False, color="#0f172a", lw=1.2))
+    ax.plot([radius * 1e9], [0.0], "o", color="#0f172a", ms=5)
+    ax.annotate(r"$B_\mathrm{eq} \approx 1.158\,B_0$", (radius * 1e9, 0.0),
+                xytext=(8, -14), textcoords="offset points", fontsize=9)
+    ax.plot([0.0], [0.0], "o", color="#0f172a", ms=5)
+    ax.annotate(r"$B(0) \approx 0.067\,B_0$", (0.0, 0.0),
+                xytext=(8, 6), textcoords="offset points", fontsize=9)
+
+    ax.set_aspect("equal")
+    ax.set_xlabel("x (nm)")
+    ax.set_ylabel("z (nm)")
+    ax.set_title(rf"Sphere field lines at $R = {SIZE:g}\lambda$", fontsize=11)
+    fig.colorbar(im, ax=ax, label=r"$|B|/B_0$", shrink=0.9)
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+
 def geometry_checks():
     """Return the labels of every geometry check that leaves its bound."""
     x_5, x_20, x_50 = 5.0, 20.0, 50.0
@@ -522,6 +629,11 @@ def main():
     print(f"Wrote {FIG_DIR / 'geometry_sphere.png'}")
     print(f"Wrote {FIG_DIR / 'geometry_finite_body.png'}")
     print(f"Wrote {FIG_DIR / 'geometry_film.png'}")
+
+    field_maps_figure(FIG_DIR / "field_maps.png")
+    sphere_field_lines_figure(FIG_DIR / "sphere_field_lines.png")
+    print(f"Wrote {FIG_DIR / 'field_maps.png'}")
+    print(f"Wrote {FIG_DIR / 'sphere_field_lines.png'}")
 
     if failed:
         print(f"FAIL: {', '.join(failed)} above the {TARGET:g} target", file=sys.stderr)

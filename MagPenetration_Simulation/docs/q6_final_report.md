@@ -13,7 +13,7 @@ The theory starts from the London equations and the Meissner effect. A two-fluid
 
 The finite difference, relaxation, and shooting methods reproduce the slab answer on one grid. Finite differences and relaxation hold a relative error near $2.8 \times 10^{-6}$. Shooting holds $1.5 \times 10^{-10}$. Every method stays below the $10^{-3}$ target. The geometry checks match the closed forms to the reported digits.
 
-Screening weakens as $s/\lambda$ falls, and a rise in temperature increases $\lambda$ and flattens the profile. The app has eight pages, one material card per page, a physical or ratio size mode, and a field map for each page. Each of the eight pages passes an automated app test.
+Screening weakens as $s/\lambda$ falls, and a rise in temperature increases $\lambda$ and flattens the profile. The app has eight pages, one material card per page, a physical or ratio size mode, and a field map for each page. Each of the eight pages passes an automated app test. The report adds a field-map gallery and a sphere field-line detail.
 
 ## 2. Scope and deliverables
 
@@ -28,6 +28,7 @@ The deliverables are these:
 - An eight-page interactive app with per-page controls and field maps.
 - Automated checks for the figure script, the field maps, the app pages, and the module imports.
 - Figures that record the profiles, the errors, and the geometry checks.
+- Static field maps for the five geometry models, with one sphere field-line detail.
 
 The report stays inside the local London model at a static field. It does not treat vortices, disorder, or time-dependent fields.
 
@@ -442,7 +443,33 @@ Table 1 collects the center value of each model at $s/\lambda = 5$ and $\lambda 
 
 The order is physical. The slab screens best, because a parallel plate has no curvature and no demagnetization. The cylinder next, and the sphere last, because the sphere lets the field around its curved surface.
 
-### 6.9 Main physical result
+### 6.9 Field maps
+
+The app uses the same data for its interactive maps and these static figures. The gallery holds five panels at a 5λ display size.
+
+- Slab: a longitudinal x-z section. The field is axial, and the lines are straight.
+- Cylinder: a longitudinal r-z section. The field is axial, and the lines are straight.
+- Sphere: an x-z section. The field is in the plane, and the lines bend.
+- Finite body: an x-y map. `B` is out of plane, and the panel has no in-plane field lines.
+- Film: a longitudinal x-z section. It is identical to the slab in a parallel field.
+
+The panels share one color scale, `|B|/B0` from 0 to 1.2.
+
+![Field maps for the five geometry models](figures/field_maps.png){width=100%}
+
+*Figure 10. Field maps at λ = 50 nm. Slab, cylinder, and film use a longitudinal section. The sphere uses an x-z section. The finite body uses an x-y map and has no in-plane field lines because B is out of plane.*
+
+The second figure gives the sphere detail. The heat map shows the penetration layer at a finite λ. The dark lines are the exterior field lines, and they stop at $r = R$.
+
+The center value is $0.067\,B_0$ and the equator value is $1.158\,B_0$. An equator value above one is flux crowding.
+
+![Sphere field lines at R = 5λ](figures/sphere_field_lines.png){width=80%}
+
+*Figure 11. Sphere at R = 5λ. The heat map shows the finite-λ penetration. The exterior field lines are clipped at $r = R$, where the expulsion and the equator crowding are visible.*
+
+The cylinder model is axial, and its panel is a longitudinal r-z section. It is not a transverse cross-section. A cylinder in a transverse field would show in-plane field lines and an equator peak near $2\,B_0$. That case needs a different vector London solution, and this report does not include it.
+
+### 6.10 Main physical result
 
 The figures support one geometric result and one thermal result.
 
@@ -482,7 +509,7 @@ The grid control sets the points per axis, from 41 to 1001 in steps of 20, with 
 
 ### 7.4 Field-map convention
 
-The field maps come from `src/magpenetration_simulation/visualization.py`, and each page draws its own map. The scale runs over a fixed range of $0$ to $1$ in $|B|/B_0$. The fixed scale lets the pages compare at a glance.
+The field maps come from `src/magpenetration_simulation/visualization.py`, and each page draws its own map. The scale runs over a fixed range of $0$ to $1$ in $|B|/B_0$. The fixed scale lets the pages compare at a glance. The static gallery uses $0$ to $1.2$ so the sphere peak is visible. The app keeps $0$ to $1$ for cross-page comparison.
 
 The slab, cylinder, and film pages draw a longitudinal section. The field lines are straight and follow the field axis. The heatmap shows $|B|/B_0$. Those three models have one field component, so straight lines are the correct picture.
 
@@ -500,11 +527,11 @@ The Methods page has its own controls: $d/\lambda$, $N$, the method selector, an
 
 The Slab page gives cards for the center field, the mean field, and the screened fraction. It merges the temperature family into the main profile, with the family faint and the current $T$ bold. It also plots $\lambda(T)$ with a marker at the current value. The page warns when $d/\lambda$ falls below 2, where the Pearl length replaces $\lambda$.
 
-The Cylinder page gives the axial Bessel profile, the $R/\lambda$ family, the temperature family, the $B/\lambda$ chart, the longitudinal field map, and the same three cards.
+The Cylinder page gives the merged temperature family, the $R/\lambda$ family, the longitudinal field map, and the same four cards.
 
-The Sphere page shows the exact vector solution. It plots the equatorial radial profile and the boundary field against latitude. It gives five cards, for the center field, the axial mean, the screening factor, the equator field, and the dipole moment. The normal-state toggle shows a card that says the model has no normal-state limit.
+The Sphere page shows the exact vector solution. It plots the equatorial radial profile and the boundary field against latitude. It gives six cards, for λ(T), the center field, the axial mean, the screening factor, the equator field, and the dipole moment. The normal-state toggle shows a card that says the model has no normal-state limit.
 
-The Finite body page solves the two-dimensional scalar equation on a rectangle. It holds $B = B_0$ on all four edges and draws $B$ out of plane as an $x$-$y$ heatmap. A dashed mask marks the valid zone, at least $3\lambda$ from every edge. The cards give the center field, the mean field, the residual, and the sweep count. This page uses the current $T$ only, with no temperature family.
+The Finite body page solves the two-dimensional scalar equation on a rectangle. It holds $B = B_0$ on all four edges and draws $B$ out of plane as an $x$-$y$ heatmap. A dashed mask marks the valid zone, at least $3\lambda$ from every edge. The cards give λ(T), the center field, the mean field, and the valid-zone fraction. A caption gives the residual and the sweep count. This page uses the current $T$ only, with no temperature family.
 
 The Film page shows the Pearl length $\Lambda = 2\lambda^2/d$, the regime, the parallel profile, the temperature family, and the center and mean cards.
 
@@ -525,7 +552,9 @@ The page opens at <http://localhost:8501>. All UI ranges, defaults, steps, chart
 
 The evidence for the report rests on four checks.
 
-The figure script is the first check. `scripts/make_figures.py` runs the four slab methods at the agreed defaults and prints the maximum absolute and relative error of each numerical method. It also writes the nine figures. It also checks the temperature guard numbers, the cylinder and slab values, and the sphere, finite-body, and film values. It exits with status 1 if any error passes $10^{-3}$ or any bound fails. The last run passed every group and printed the three summary lines.
+The figure script is the first check. `scripts/make_figures.py` runs the four slab methods at the agreed defaults and prints the maximum absolute and relative error of each numerical method. It also writes the eleven figures. It also checks the temperature guard numbers, the cylinder and slab values, and the sphere, finite-body, and film values. It exits with status 1 if any error passes $10^{-3}$ or any bound fails. The last run passed every group and printed the three summary lines.
+
+The field-map gallery and the sphere field-line figure are static renders of the same data as the app. The script calls the app grid helpers and the app dipole solution. A reader then sees the same field in both places.
 
 The visualization self-check is the second check. `visualization.py` runs an assertion block when the module starts as a script. The block checks that the slab margin equals $B_0$, that the slab center is screened, and that the cylinder axis is below the wall. It checks that the sphere center matches `sphere_center_field` to $10^{-9}$ and that the exterior dipole stays on the $B_0$ scale. It checks that every integrated field line is finite and that at least one line has more than five points. It checks that the finite-body field stays inside $[0, B_0]$ and that the pane keeps its 2:1 aspect. It checks that the Combined figure has six cells, one color bar, and six labels. The last run passed with no assertion error.
 
@@ -552,6 +581,10 @@ The sphere model has no normal-state limit. The sphere page states this. The vec
 The finite-body solver is a scalar two-dimensional solver. It has one component on a rectangle, and it cannot represent a transverse field or a three-dimensional body. Box and disk geometries need later work.
 
 The app field maps are visual aids. They are not new solvers, with one exception. The finite-body map is the direct output of the scalar solver. The longitudinal sections of the slab, cylinder, and film show the profile that the closed form gives. The straight field lines illustrate the one-component field, not a computed vector field. The sphere map is the exception on the vector side, because it integrates the real field of the London dipole plus the uniform field.
+
+The cylinder model takes an axial field, so every cylinder map is a longitudinal r-z section. It is not a transverse cross-section. A cylinder in a transverse field would show in-plane field lines and an equator peak near $2\,B_0$. That case needs a different vector London solution, and it is not in this work.
+
+The sphere field-line figure has its own limit. It draws the exterior field lines and clips them at $r = R$. The heat map shows the penetration at a finite $\lambda$. The interior lines come from a different London potential, and the figure does not draw them.
 
 The numerics have their own limits. The uniform mesh meets the $10^{-3}$ target up to $d/\lambda \approx 100$ at $N = 401$. A graded mesh, or a larger $N$, would move that limit outward. The relaxation sweep caps its count, and a failed convergence raises an error instead of a quiet wrong answer.
 
@@ -657,4 +690,4 @@ The code is in `src/magpenetration_simulation/`.
 | `visualization.py` | the field map of each page |
 | `ui.py`, `ui_config.py` | the layout, the styles, and every control range |
 | `app.py`, `views/` | the eight pages |
-| `scripts/make_figures.py` | the smoke check and the nine figures |
+| `scripts/make_figures.py` | the smoke check and the eleven figures |
