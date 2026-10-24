@@ -141,7 +141,15 @@ def render(material):
     """Compare the slab solvers at the shared lambda(T) and B_0."""
     t = ui.theme()
     lam, b_0 = material["lambda"], material["b_0"]
-    ui.page_title("Methods", "Three slab solvers against the exact London profile.")
+    ui.page_title("Methods", "Three slab solvers on one shared grid.")
+    st.markdown(
+        "**Finite difference** solves the tridiagonal London system in one pass. "
+        "**Red-black SOR** relaxes the same grid in two interleaved colours. "
+        "**Shooting** integrates the ODE from one face and matches B = B₀ at the other. "
+        "The analytic cosh profile, B = B₀ cosh(x/λ) / cosh(d/2λ), is the reference for "
+        "every comparison. The target is a maximum relative error below 1e-3, drawn as the "
+        "dashed line on the log scale."
+    )
 
     with ui.card("controls"):
         c = st.columns(2, gap="large")
