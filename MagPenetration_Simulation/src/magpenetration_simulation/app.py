@@ -10,6 +10,7 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 from plotly.offline import get_plotlyjs
+from streamlit.components.v2 import component
 
 from magpenetration_simulation.slab import (
     _grid,
@@ -108,9 +109,9 @@ def _alpha(hex_color, a):
 
 def style(fig, t, height, **layout):
     """Shared look for every chart."""
-    axis = dict(automargin=True, gridcolor=t["grid"], zeroline=False, showline=True, linecolor=t["axis"],
-                ticks="outside", tickcolor=t["axis"], ticklen=4, title_standoff=8,
-                tickfont={"size": 12, "color": t["muted"]}, title_font={"size": 13, "color": t["muted"]})
+    axis = {"automargin": True, "gridcolor": t["grid"], "zeroline": False, "showline": True, "linecolor": t["axis"],
+                "ticks": "outside", "tickcolor": t["axis"], "ticklen": 4, "title_standoff": 8,
+                "tickfont": {"size": 12, "color": t["muted"]}, "title_font": {"size": 13, "color": t["muted"]}}
     fig.update_xaxes(**axis)
     fig.update_yaxes(**axis)
     fig.update_layout(template=go.layout.Template(), height=height, autosize=True,
@@ -340,9 +341,9 @@ export default function (component) {
 }
 """
 
-_live_slider = st.components.v2.component(
+_live_slider = component(
     "live_slider", html=LIVE_SLIDER_HTML, css=LIVE_SLIDER_CSS, js=LIVE_SLIDER_JS)
-_live_chart = st.components.v2.component(
+_live_chart = component(
     "live_chart", html=LIVE_CHART_HTML, js=LIVE_CHART_JS, isolate_styles=False)
 
 
@@ -483,7 +484,7 @@ with slab_tab:
     with left, st.container(border=True, key="card_profile"):
         a, b, c1 = st.columns([0.9, 2, 1.1], vertical_alignment="center")
         a.markdown('<p class="card-title">Field profile</p>', unsafe_allow_html=True)
-        shown_p = b.pills("Shown on profile", ["Analytic", *METHODS], format_func=LABEL.get,
+        shown_p = b.pills("Shown on profile", ["Analytic", *METHODS], format_func=LABEL.__getitem__,
                           selection_mode="multi", default=["Analytic", "Finite difference"],
                           label_visibility="collapsed", key="pills_profile")
         units_p = c1.segmented_control("Profile units", UNITS, default="Scaled",
@@ -492,7 +493,7 @@ with slab_tab:
     with right, st.container(border=True, key="card_error"):
         a, b, c2, c3 = st.columns([0.5, 1.45, 0.85, 1.1], vertical_alignment="center")
         a.markdown('<p class="card-title">Error</p>', unsafe_allow_html=True)
-        shown_e = b.pills("Shown on error", list(METHODS), format_func=LABEL.get, selection_mode="multi",
+        shown_e = b.pills("Shown on error", list(METHODS), format_func=LABEL.__getitem__, selection_mode="multi",
                           default=["Finite difference"], label_visibility="collapsed", key="pills_error")
         scale = c2.segmented_control("Scale", ["Signed", "Log"], default="Signed",
                                      label_visibility="collapsed", key="scale") or "Signed"
