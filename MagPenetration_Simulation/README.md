@@ -161,11 +161,12 @@ uv run python scripts/make_figures.py
 The script runs every method at the defaults below.
 It prints the maximum error of each numerical method.
 It prints the temperature guard values and the geometry checks.
-It writes nine figures: `docs/figures/slab_profile.png`,
+It writes eleven figures: `docs/figures/slab_profile.png`,
 `docs/figures/slab_error.png`, `docs/figures/temperature_lambda.png`,
 `docs/figures/temperature_profiles.png`, `docs/figures/geometry_cylinder.png`,
 `docs/figures/geometry_comparison.png`, `docs/figures/geometry_sphere.png`,
-`docs/figures/geometry_finite_body.png`, and `docs/figures/geometry_film.png`.
+`docs/figures/geometry_finite_body.png`, `docs/figures/geometry_film.png`,
+`docs/figures/field_maps.png`, and `docs/figures/sphere_field_lines.png`.
 It also prints the clamp `lambda` and the clamp `B(0)/B_0`.
 It prints the sphere, finite-body, and film checks after the cylinder checks.
 The script exits with status 1 if any error is above $10^{-3}$ or a bound
