@@ -289,14 +289,16 @@ The screening currents then spread over $\Lambda$, and the field concentrates at
 
 - The header title is a button.
   A click on the title returns to Theory.
-- The top navigation bar shows six pages.
-  The order is Theory, Methods, Slab, Cylinder, Combined, and Sphere.
+- The top navigation bar shows eight pages.
+  The order is Theory, Methods, Slab, Cylinder, Sphere, Finite body, Film, and Combined.
 - The sidebar sets $T$, $T_c$, $\lambda_0$, and $B_0$, and it holds the normal-state toggle and the theme switch.
 - The slider stops at $0.995\,T_c$, so $\lambda(T)$ keeps a finite value.
 - Each page sets its own size, $d/\lambda$ or $R/\lambda$, and its own $N$.
 - The app has no Temperature tab.
   The geometry pages take $\lambda(T)$ from the sidebar.
-- The Sphere page is a placeholder that states the exact vector formulas and computes no values.
+- The Sphere page shows the exact vector solution and its metric cards.
+- The Finite body page solves the 2D scalar rectangle.
+- The Film page shows the Pearl length, the regime, and the parallel profile.
 - The 2D field-line view and the field-magnitude view are a separate slice.
 
 The Slab page warns when $d < 2\lambda$ and shows $\Lambda = 2\lambda^2/d$.
@@ -330,6 +332,102 @@ The smoke check checks these values:
 - Wall value $B(R)/B_0 = 1$ over the whole $R/\lambda$ family.
 - Near-wall form $\sqrt{R/r}\,e^{-s/\lambda}$ within $10^{-3}$ at $R = 20\lambda$ for $s/\lambda \le 2$.
 
+### Implemented sphere slice
+
+[`sphere.py`](../src/magpenetration_simulation/sphere.py) provides seven public functions.
+
+| Function | Result |
+|---|---|
+| `sphere_potential(r, radius, lam, b0)` | the toroidal potential $\psi(r)$ in T m |
+| `sphere_field(r, theta, radius, lam, b0)` | the interior components $B_r$ and $B_\theta$ |
+| `sphere_center_field(radius, lam, b0)` | the center value $B_0 (R/\lambda)/\sinh(R/\lambda)$ |
+| `sphere_mean_field(radius, lam, b0)` | the axial mean $B_0 (1 - S)$ |
+| `sphere_screening_factor(radius, lam, b0)` | $S = 1 - 3(\lambda/R)\coth(R/\lambda) + 3\lambda^2/R^2$ |
+| `sphere_dipole_moment(radius, lam, b0)` | the exterior dipole $-(2\pi R^3 B_0/\mu_0) S$ |
+| `sphere_equator_field(radius, lam, b0)` | the equator value, which approaches $1.5 B_0$ |
+
+The code uses the exact vector London solution.
+The vector boundary match at $r = R$ includes demagnetization.
+The scaled forms of $i_1$ and $i_1'$ cannot overflow at a large $R/\lambda$.
+
+The Sphere page reads these functions through
+[`views/sphere.py`](../src/magpenetration_simulation/views/sphere.py).
+The smoke check writes [`figures/geometry_sphere.png`](figures/geometry_sphere.png).
+
+The smoke check checks these values:
+
+- Sphere center at $R = 5\lambda$: $0.06738252915$.
+- Sphere equator at $R = 2.9\lambda$: $1.157976253$.
+- Sphere screening factor at $R = 50\lambda$: $0.9412$.
+
+This slice does not model the normal state or the vortices.
+The 2D field lines of the sphere are a later slice.
+
+### Implemented finite-body slice
+
+[`finite_body.py`](../src/magpenetration_simulation/finite_body.py) provides the 2D scalar solver.
+
+| Function | Result |
+|---|---|
+| `rect_field_finite_difference(width, height, lam, b0, nx=81, ny=81, ...)` | the 2D solve, and it returns a `RectSolution` |
+| `rect_valid_mask(x, y, width, height, lam, margin=3.0)` | the mask of points where the 1D limit is useful |
+| `rect_edge_distance(x, y, width, height)` | the distance from each point to the nearest edge |
+| `rect_center_field(solution)` | the field at the node nearest the center |
+| `rect_1d_limit(width, height, lam, b0, n_points=401)` | the 1D slab profile across the height |
+
+`RectSolution` holds `x`, `y`, `b`, `residual`, `sweeps`, `hx`, `hy`, and `converged`.
+
+The solver covers one component $B_z$ on a rectangle.
+The solve sets the Dirichlet value $B_0$ on every edge.
+The stencil is the five-point form, and red-black SOR does the sweeps.
+The interior update divides by $2/h_x^2 + 2/h_y^2 + 1/\lambda^2$.
+The plus sign in that formula is correct.
+The report already gives it in Model 4.
+
+The Finite body page reads these functions through
+[`views/finite_body.py`](../src/magpenetration_simulation/views/finite_body.py).
+The smoke check writes [`figures/geometry_finite_body.png`](figures/geometry_finite_body.png).
+
+The smoke check checks these values at $N = 81$:
+
+- Rectangle center, $20 \times 5\lambda$: $0.1631508352$.
+- Rectangle center, $5 \times 5\lambda$: $0.2573616334$.
+- Rectangle center, $20 \times 1\lambda$: $0.886820218$.
+- Wide rectangle against the slab analytic value at $d = 5\lambda$: relative difference $4.881504792 \times 10^{-4}$.
+
+This slice leaves out the outside-field match, demagnetization, and the turning of the edge current.
+Box and disk geometries are later slices.
+The valid-zone mask marks the points where the 1D limit is useful, at least $3\lambda$ from every edge.
+
+### Implemented film slice
+
+[`film.py`](../src/magpenetration_simulation/film.py) provides eight public functions.
+
+| Function | Result |
+|---|---|
+| `pearl_length(lam, d)` | the Pearl length $\Lambda = 2\lambda^2/d$ |
+| `film_crossover(lam)` | the crossover thickness $2\lambda$ |
+| `pearl_ratio(lam, d)` | the ratio $\Lambda/\lambda = 2\lambda/d$ |
+| `inplane_screening_length(lam, d)` | the in-plane length $\max(\Lambda, \lambda)$ |
+| `film_regime(lam, d)` | the regime name, `pearl`, `crossover`, or `thick` |
+| `film_parallel_profile(x, d, lam, b0)` | the parallel-field profile at any thickness |
+| `film_parallel_center_field(d, lam, b0)` | the center value $B_0/\cosh(d/2\lambda)$ |
+| `film_parallel_mean_field(d, lam, b0)` | the mean $B_0 (2\lambda/d)\tanh(d/2\lambda)$ |
+
+The Film page reads these functions through
+[`views/film.py`](../src/magpenetration_simulation/views/film.py).
+The smoke check writes [`figures/geometry_film.png`](figures/geometry_film.png).
+
+The smoke check checks these values:
+
+- $\Lambda/\lambda$ at $d = 2\lambda$: $1$, regime `crossover`.
+- $\Lambda/\lambda$ at $d = 1\lambda$: $2$, regime `pearl`.
+- $\Lambda/\lambda$ at $d = 10\lambda$: $0.2$, regime `thick`.
+- Parallel center and mean at $d = 5\lambda$: $0.1630712319$ and $0.3946457193$.
+
+The parallel field is exact at every thickness.
+This slice does not solve the perpendicular field, its edge currents, or demagnetization.
+
 ## What was done and why
 
 Issue 3 calls for a list of usable geometry models with caveats.
@@ -346,12 +444,16 @@ The list below states each family and its limits.
   Issue 6.5 can map the midplane profile, and the map must mark the edge zone where the profile fails.
 - Thin films cross into the Pearl regime below $d = 2\lambda$.
   The interface must switch the length scale to $\Lambda$ there.
-- The slab and the cylinder now have code.
+- The slab, the cylinder, the sphere, and the film now have code.
   [`slab.py`](../src/magpenetration_simulation/slab.py) provides three numerical solvers and the cosh form.
   [`cylinder.py`](../src/magpenetration_simulation/cylinder.py) provides the Bessel form and its two scalars.
-- The report still covers the sphere and the finite bodies.
-  Neither has a solver yet.
-- The app has no 2D field map yet.
+  [`sphere.py`](../src/magpenetration_simulation/sphere.py) provides the exact vector solution and its scalars.
+  [`film.py`](../src/magpenetration_simulation/film.py) provides the Pearl length, the regime, and the parallel profile.
+- The finite-body rectangle scalar solver now has code.
+  [`finite_body.py`](../src/magpenetration_simulation/finite_body.py) provides the 2D solve and the valid-zone mask.
+  Box and disk geometries are later slices.
+- The app draws the rectangle as a 2D scalar heatmap.
+  The 2D field-line layer stays a separate slice.
 
 Every closed form follows from the local London equation.
 The numeric path inherits the same limits.
