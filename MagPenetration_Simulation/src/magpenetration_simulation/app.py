@@ -10,6 +10,7 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 from plotly.offline import get_plotlyjs
+from streamlit.components.v2 import component
 
 from magpenetration_simulation.slab import (
     _grid,
@@ -17,6 +18,13 @@ from magpenetration_simulation.slab import (
     slab_field_finite_difference,
     slab_field_relaxation,
     slab_field_shooting,
+)
+from magpenetration_simulation.temperature import (
+    clamp_temperature,
+    guard_metrics,
+    lambda_curve,
+    lambda_of_temperature,
+    temperature_profile,
 )
 
 METHODS = {
@@ -31,6 +39,8 @@ CHART_H = 480
 MU0 = 1.25663706212e-6  # vacuum permeability in H/m
 SUPERSCRIPT = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
 
+FAMILY_T = (0.0, 0.217, 0.435, 0.652, 0.870, 0.957)
+TEMP_POINTS = 401
 THEMES = {
     "light": {
         "bg": "#f7f8fa", "card": "#ffffff", "border": "#e6e8ec", "text": "#0f172a",
@@ -99,9 +109,9 @@ def _alpha(hex_color, a):
 
 def style(fig, t, height, **layout):
     """Shared look for every chart."""
-    axis = dict(automargin=True, gridcolor=t["grid"], zeroline=False, showline=True, linecolor=t["axis"],
-                ticks="outside", tickcolor=t["axis"], ticklen=4, title_standoff=8,
-                tickfont={"size": 12, "color": t["muted"]}, title_font={"size": 13, "color": t["muted"]})
+    axis = {"automargin": True, "gridcolor": t["grid"], "zeroline": False, "showline": True, "linecolor": t["axis"],
+                "ticks": "outside", "tickcolor": t["axis"], "ticklen": 4, "title_standoff": 8,
+                "tickfont": {"size": 12, "color": t["muted"]}, "title_font": {"size": 13, "color": t["muted"]}}
     fig.update_xaxes(**axis)
     fig.update_yaxes(**axis)
     fig.update_layout(template=go.layout.Template(), height=height, autosize=True,
@@ -197,10 +207,64 @@ def error_chart(r, shown, scale, units, t):
                          title="|B − B_analytic| / B₀" if units == "Scaled" else "|B − B_analytic| (µT)")
     else:
         fig.add_hline(y=0, line={"color": t["axis"], "width": 1})
-        fig.update_yaxes(exponentformat="power",
+        fig.update_yaxes(type="linear", autorange=True, range=None, dtick=None,
+                         exponentformat="power",
                          title="(B − B_analytic) / B₀" if units == "Scaled" else "B − B_analytic (µT)")
     fig.update_xaxes(title=x_title)
-    return style(fig, t, CHART_H, uirevision=f"error-{units}")
+    return style(fig, t, CHART_H, uirevision=f"error-{units}-{scale}")
+
+
+def lambda_chart(t_c, lambda_0_m, t_k, theme):
+    """Penetration depth against reduced temperature, with the current T marked."""
+    ratio = np.linspace(0.0, clamp_temperature(t_c) / t_c, TEMP_POINTS)
+    lam = lambda_curve(ratio * t_c, lambda_0_m, t_c) / lambda_0_m
+    fig = go.Figure()
+    fig.add_scatter(x=ratio, y=lam, mode="lines", name="λ(T)",
+                    line={"color": theme["analytic"], "width": 2.2}, hovertemplate="%{y:.3f}")
+    fig.add_scatter(x=[t_k / t_c], y=[lambda_of_temperature(t_k, lambda_0_m, t_c) / lambda_0_m],
+                    mode="markers", hoverinfo="skip",
+                    marker={"size": 11, "color": theme["card"],
+                            "line": {"color": theme["Finite difference"], "width": 2}})
+    fig.add_vline(x=0.995, line={"color": theme["axis"], "dash": "dot", "width": 1})
+    fig.update_xaxes(title="T / T_c")
+    fig.update_yaxes(title="λ(T) / λ₀")
+    return style(fig, theme, CHART_H, uirevision="temp-lambda")
+
+
+def temperature_profile_chart(t_c, lambda_0_m, d_m, b_0, t_k, units, theme):
+    """Field profiles at the fixed T/Tc family, faint, plus the current T in bold."""
+    x = np.linspace(-d_m / 2.0, d_m / 2.0, TEMP_POINTS)
+    yf = b_0 * 1e3 if units == "B (mT)" else 1.0
+    fig = go.Figure()
+    last = len(FAMILY_T) - 1
+    for i, f in enumerate(FAMILY_T):
+        y = temperature_profile(x, d_m, lambda_0_m, t_c, f * t_c, b_0) * yf
+        fig.add_scatter(x=x * 1e9, y=y, mode="lines", hoverinfo="skip",
+                        line={"color": _alpha(theme["Finite difference"], 0.22 + 0.5 * i / last),
+                              "width": 1.4})
+    y = temperature_profile(x, d_m, lambda_0_m, t_c, t_k, b_0) * yf
+    fig.add_scatter(x=x * 1e9, y=y, mode="lines", name="T",
+                    line={"color": theme["analytic"], "width": 3}, hovertemplate="%{y:.4f}")
+    fig.update_xaxes(title="x (nm)", range=[-d_m * 1e9 / 2.0, d_m * 1e9 / 2.0])
+    fig.update_yaxes(title="B (mT)" if units == "B (mT)" else "B / B₀", range=[0, 1.05 * yf])
+    return style(fig, theme, CHART_H, uirevision=f"temp-family-{units}")
+
+
+def normal_state_infographic(theme):
+    """Explain, in three steps, why B is flat above Tc. Colours come from inject_css."""
+    steps = (
+        ("Superfluid density", "n<sub>s</sub> → 0", "The superconducting carriers vanish."),
+        ("London depth", "λ → ∞", "The screening length exceeds the slab."),
+        ("Field equation", "∇²B = B/λ² → 0",
+         "With B(±d/2) = B₀, the field is flat at B₀. The screening current J is zero."),
+    )
+    cards = "".join(
+        f'<div class="normal-card"><div class="normal-step">Step {i + 1}</div>'
+        f'<div class="normal-title">{title}</div><div class="normal-eq">{eq}</div>'
+        f'<div class="normal-note">{note}</div></div>'
+        for i, (title, eq, note) in enumerate(steps)
+    )
+    st.markdown(f'<div class="normal-grid">{cards}</div>', unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------- custom components
@@ -277,9 +341,9 @@ export default function (component) {
 }
 """
 
-_live_slider = st.components.v2.component(
+_live_slider = component(
     "live_slider", html=LIVE_SLIDER_HTML, css=LIVE_SLIDER_CSS, js=LIVE_SLIDER_JS)
-_live_chart = st.components.v2.component(
+_live_chart = component(
     "live_chart", html=LIVE_CHART_HTML, js=LIVE_CHART_JS, isolate_styles=False)
 
 
@@ -302,7 +366,8 @@ def live_chart(fig, key):
     Plotly.js is sent to the browser once per session, with the first chart.
     """
     data = {"figure": json.loads(fig.to_json()),
-            "config": {"displayModeBar": False, "responsive": True}}
+            "config": {"displayModeBar": True, "modeBarButtons": [["resetScale2d"]],
+                       "displaylogo": False, "responsive": True}}
     if not st.session_state.get("plotly_js_sent"):
         data["plotly_js"] = get_plotlyjs()
         st.session_state.plotly_js_sent = True
@@ -328,7 +393,7 @@ def inject_css(t):
     .stApp .app-title {{text-align: center; font-size: 2rem !important; font-weight: 700; color: {t['text']};
         letter-spacing: -0.02em; line-height: 1.2; margin: 0.1rem 0 0.5rem 0;}}
     .stApp .card-title {{font-weight: 650; font-size: 1rem !important; color: {t['text']}; margin: 0;}}
-    .st-key-controls, .st-key-card_profile, .st-key-card_error {{background: {t['card']};
+    .st-key-controls, .st-key-card_profile, .st-key-card_error, .st-key-card_normal, .st-key-card_temp_lambda, .st-key-card_temp_profile {{background: {t['card']};
         border-color: {t['border']} !important;}}
     .st-key-controls {{padding-top: 0.6rem; padding-bottom: 0.2rem;}}
     [data-testid="stMetric"] {{background: {t['card']}; border: 1px solid {t['border']};
@@ -346,6 +411,15 @@ def inject_css(t):
         content: "●"; margin-right: 0.35rem;}}
     .stApp button[data-variant][aria-pressed="false"] p::before {{opacity: 0.35;}}
     {dots}
+    .normal-grid {{display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.7rem; margin-top: 0.3rem;}}
+    .normal-card {{background: {t['card']}; border: 1px solid {t['border']}; border-radius: 0.55rem;
+        padding: 0.6rem 0.8rem;}}
+    .normal-step {{font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em;
+        color: {t['muted']}; font-weight: 600;}}
+    .normal-title {{font-size: 0.9rem; font-weight: 650; color: {t['text']}; margin: 0.15rem 0 0.35rem 0;}}
+    .normal-eq {{font-size: 1.05rem; color: {t['Finite difference']}; margin-bottom: 0.35rem;}}
+    .normal-note {{font-size: 0.78rem; color: {t['muted']}; line-height: 1.35;}}
+    @media (max-width: 900px) {{ .normal-grid {{grid-template-columns: 1fr;}} }}
     </style>""", unsafe_allow_html=True)
 
 
@@ -364,67 +438,152 @@ t = THEMES[st.session_state.theme]
 inject_css(t)
 st.markdown('<div class="app-title">Field penetration into a superconducting slab</div>',
             unsafe_allow_html=True)
+slab_tab, temp_tab = st.tabs(["Slab", "Temperature"])
 
-with st.container(border=True, key="controls"):
-    c = st.columns(4, gap="large")
-    with c[0]:
-        d_over_lam = live_slider("Slab thickness d/λ", 0.5, 100.0, 5.0, 0.5, "d_over_lam", t, decimals=1)
-    with c[1]:
-        b0_mT = live_slider("Applied field B₀", 10, 500, 50, 10, "b0", t, unit="mT")
-    with c[2]:
-        lam0_nm = live_slider("Penetration depth λ₀", 10, 200, 50, 5, "lam0", t, unit="nm")
-    with c[3]:
-        n_points = int(live_slider("Grid points N (odd)", 41, 2001, 401, 20, "n_points", t))
+with slab_tab:
+    with st.container(border=True, key="controls"):
+        c = st.columns(4, gap="large")
+        with c[0]:
+            d_over_lam = live_slider("Slab thickness d/λ", 0.5, 100.0, 5.0, 0.5, "d_over_lam", t, decimals=1)
+        with c[1]:
+            b0_mT = live_slider("Applied field B₀", 10, 500, 50, 10, "b0", t, unit="mT")
+        with c[2]:
+            lam0_nm = live_slider("Penetration depth λ₀", 10, 200, 50, 5, "lam0", t, unit="nm")
+        with c[3]:
+            n_points = int(live_slider("Grid points N (odd)", 41, 2001, 401, 20, "n_points", t))
 
-r = solve(d_over_lam, b0_mT, lam0_nm, n_points)
+    r = solve(d_over_lam, b0_mT, lam0_nm, n_points)
 
-centre = r["exact"][n_points // 2]
-per_lam = (n_points - 1) / d_over_lam
-dx_nm = r["d"] / (n_points - 1) * 1e9
-surface_current = r["b0"] / (MU0 * r["lam"]) * np.tanh(d_over_lam / 2)
+    centre = r["exact"][n_points // 2]
+    per_lam = (n_points - 1) / d_over_lam
+    dx_nm = r["d"] / (n_points - 1) * 1e9
+    surface_current = r["b0"] / (MU0 * r["lam"]) * np.tanh(d_over_lam / 2)
 
-k = st.columns(7)
-k[0].metric("Centre field B(0)", field_text(centre * r["b0"]),
-            f"{centre:.3f} B₀" if centre > 1e-3 else f"{centre:.1e} B₀",
-            delta_color="off", delta_arrow="off")
-k[1].metric("Slab thickness d", f"{r['d'] * 1e9:,.0f} nm", f"λ = {lam0_nm} nm",
-            delta_color="off", delta_arrow="off")
-k[2].metric("Surface current J", f"{sci(surface_current)} A/m²", "at each face",
-            delta_color="off", delta_arrow="off",
-            help="Screening current density at each face: J = (1/μ₀) dB/dx = B₀ tanh(d/2λ) / (μ₀λ).")
-k[3].metric("Resolution", f"{per_lam:.0f} pts/λ" if per_lam >= 10 else f"{per_lam:.1f} pts/λ",
-            f"Δx = {dx_nm:.3g} nm", delta_color="off", delta_arrow="off")
-for col, name in zip(k[4:], METHODS):
-    m = r["m"][name]
-    if "error" in m:
-        col.metric(f"{SHORT[name]} max error", "failed", help=m["error"])
-    else:
-        col.metric(f"{SHORT[name]} max error", field_text(m["abs"]), f"{m['rel']:.1e} B₀",
-                   delta_color="off", delta_arrow="off",
-                   help="Maximum |B − B_analytic| over the grid, absolute and as a fraction of B₀.")
+    k = st.columns(7)
+    k[0].metric("Centre field B(0)", field_text(centre * r["b0"]),
+                f"{centre:.3f} B₀" if centre > 1e-3 else f"{centre:.1e} B₀",
+                delta_color="off", delta_arrow="off")
+    k[1].metric("Slab thickness d", f"{r['d'] * 1e9:,.0f} nm", f"λ = {lam0_nm} nm",
+                delta_color="off", delta_arrow="off")
+    k[2].metric("Surface current J", f"{sci(surface_current)} A/m²", "at each face",
+                delta_color="off", delta_arrow="off",
+                help="Screening current density at each face: J = (1/μ₀) dB/dx = B₀ tanh(d/2λ) / (μ₀λ).")
+    k[3].metric("Resolution", f"{per_lam:.0f} pts/λ" if per_lam >= 10 else f"{per_lam:.1f} pts/λ",
+                f"Δx = {dx_nm:.3g} nm", delta_color="off", delta_arrow="off")
+    for col, name in zip(k[4:], METHODS):
+        m = r["m"][name]
+        if "error" in m:
+            col.metric(f"{SHORT[name]} max error", "failed", help=m["error"])
+        else:
+            col.metric(f"{SHORT[name]} max error", field_text(m["abs"]), f"{m['rel']:.1e} B₀",
+                       delta_color="off", delta_arrow="off",
+                       help="Maximum |B − B_analytic| over the grid, absolute and as a fraction of B₀.")
 
-UNITS = ["Scaled", "Physical"]
-left, right = st.columns(2, gap="medium")
-with left, st.container(border=True, key="card_profile"):
-    a, b, c1 = st.columns([0.9, 2, 1.1], vertical_alignment="center")
-    a.markdown('<p class="card-title">Field profile</p>', unsafe_allow_html=True)
-    shown_p = b.pills("Shown on profile", ["Analytic", *METHODS], format_func=LABEL.get,
-                      selection_mode="multi", default=["Analytic", "Finite difference"],
-                      label_visibility="collapsed", key="pills_profile")
-    units_p = c1.segmented_control("Profile units", UNITS, default="Scaled",
-                                   label_visibility="collapsed", key="units_profile") or "Scaled"
-    live_chart(profile_chart(r, shown_p, units_p, t), key="profile_chart")
-with right, st.container(border=True, key="card_error"):
-    a, b, c2, c3 = st.columns([0.5, 1.45, 0.85, 1.1], vertical_alignment="center")
-    a.markdown('<p class="card-title">Error</p>', unsafe_allow_html=True)
-    shown_e = b.pills("Shown on error", list(METHODS), format_func=LABEL.get, selection_mode="multi",
-                      default=["Finite difference"], label_visibility="collapsed", key="pills_error")
-    scale = c2.segmented_control("Scale", ["Signed", "Log"], default="Signed",
-                                 label_visibility="collapsed", key="scale") or "Signed"
-    units_e = c3.segmented_control("Error units", UNITS, default="Scaled",
-                                   label_visibility="collapsed", key="units_error") or "Scaled"
-    live_chart(error_chart(r, shown_e, scale, units_e, t), key="error_chart")
+    UNITS = ["Scaled", "Physical"]
+    left, right = st.columns(2, gap="medium")
+    with left, st.container(border=True, key="card_profile"):
+        a, b, c1 = st.columns([0.9, 2, 1.1], vertical_alignment="center")
+        a.markdown('<p class="card-title">Field profile</p>', unsafe_allow_html=True)
+        shown_p = b.pills("Shown on profile", ["Analytic", *METHODS], format_func=LABEL.__getitem__,
+                          selection_mode="multi", default=["Analytic", "Finite difference"],
+                          label_visibility="collapsed", key="pills_profile")
+        units_p = c1.segmented_control("Profile units", UNITS, default="Scaled",
+                                       label_visibility="collapsed", key="units_profile") or "Scaled"
+        live_chart(profile_chart(r, shown_p, units_p, t), key="profile_chart")
+    with right, st.container(border=True, key="card_error"):
+        a, b, c2, c3 = st.columns([0.5, 1.45, 0.85, 1.1], vertical_alignment="center")
+        a.markdown('<p class="card-title">Error</p>', unsafe_allow_html=True)
+        shown_e = b.pills("Shown on error", list(METHODS), format_func=LABEL.__getitem__, selection_mode="multi",
+                          default=["Finite difference"], label_visibility="collapsed", key="pills_error")
+        scale = c2.segmented_control("Scale", ["Signed", "Log"], default="Signed",
+                                     label_visibility="collapsed", key="scale") or "Signed"
+        units_e = c3.segmented_control("Error units", UNITS, default="Scaled",
+                                       label_visibility="collapsed", key="units_error") or "Scaled"
+        live_chart(error_chart(r, shown_e, scale, units_e, t), key="error_chart")
 
-bad = [SHORT[n] for n, m in r["m"].items() if m.get("rel", 1) >= TARGET]
-if bad:
-    st.warning(f"{', '.join(bad)} above the 10⁻³ target. Increase N or reduce d/λ.")
+    bad = [SHORT[n] for n, m in r["m"].items() if m.get("rel", 1) >= TARGET]
+    if bad:
+        st.warning(f"{', '.join(bad)} above the 10⁻³ target. Increase N or reduce d/λ.")
+
+with temp_tab:
+    tc_col, t_col, lam_col, d_col, b_col = st.columns(5, gap="large")
+    with tc_col:
+        t_c = st.number_input("Critical temperature T_c (K)", min_value=1.0, max_value=20.0,
+                              value=9.2, step=0.1, key="temp_tc")
+    clamp = clamp_temperature(t_c)
+    if "temp_t" in st.session_state and st.session_state.temp_t > clamp:
+        st.session_state.temp_t = float(clamp)
+    with t_col:
+        t_k = st.slider("Temperature T (K)", 0.0, float(clamp), min(4.2, float(clamp)), 0.05, key="temp_t")
+    with lam_col:
+        temp_lam0_nm = st.slider("Penetration depth λ₀ (nm)", 10, 200, 50, 5, key="temp_lam0")
+    with d_col:
+        temp_d_nm = st.slider("Slab thickness d (nm)", 50, 600, 200, 10, key="temp_d")
+    with b_col:
+        temp_b0_mT = st.slider("Applied field B₀ (mT)", 10, 500, 50, 10, key="temp_b0")
+
+    lambda_0_m = temp_lam0_nm * 1e-9
+    d_m = temp_d_nm * 1e-9
+    b_0 = temp_b0_mT * 1e-3
+    g = guard_metrics(lambda_0_m, t_c, d_m)
+    lambda_t = lambda_of_temperature(t_k, lambda_0_m, t_c)
+    centre_t = 1.0 / np.cosh(d_m / (2.0 * lambda_t))
+
+    j = st.columns(3)
+    j[0].metric("Clamp temperature", f"{g['clamp_t']:.2f} K", "0.995 T_c",
+                delta_color="off", delta_arrow="off")
+    j[1].metric("λ at clamp", f"{g['lambda_clamp'] * 1e9:.1f} nm",
+                f"{g['lambda_clamp'] / lambda_0_m:.2f} λ₀", delta_color="off", delta_arrow="off")
+    j[2].metric("B(0)/B₀ at clamp", f"{g['center_ratio']:.3f}", delta_color="off", delta_arrow="off")
+
+    st.caption(f"T = {t_k:.2f} K ({t_k / t_c:.3f} T_c), λ = {lambda_t * 1e9:.1f} nm, "
+               f"B(0)/B₀ = {centre_t:.3f}.")
+    if t_k > 0.99 * t_c:
+        st.warning("T is within 1% of Tc. The two-fluid model is outside its reliable range.")
+
+    st.session_state.setdefault("show_normal", False)
+    if st.button("Hide normal-state demo" if st.session_state["show_normal"]
+                 else "Show T > Tc normal state", key="normal_toggle"):
+        st.session_state["show_normal"] = not st.session_state["show_normal"]
+
+    if st.session_state["show_normal"]:
+        t_demo = 1.05 * t_c
+        xn = np.linspace(-d_m / 2.0, d_m / 2.0, TEMP_POINTS)
+        flat = temperature_profile(xn, d_m, lambda_0_m, t_c, t_demo, b_0)
+        # Above Tc the family units control still decides the chart units.
+        units_n = st.session_state.get("temp_units") or "B/B₀"
+        if units_n == "B (mT)":
+            y_n = flat * 1e3
+            y_title = "B (mT)"
+            y_top = 1.05 * b_0 * 1e3
+        else:
+            y_n = flat / b_0
+            y_title = "B / B₀"
+            y_top = 1.05
+        with st.container(border=True, key="card_normal"):
+            st.markdown('<p class="card-title">Normal state above Tc</p>', unsafe_allow_html=True)
+            n = st.columns(3)
+            n[0].metric("T/Tc", "1.05", delta_color="off", delta_arrow="off")
+            n[1].metric("λ", "∞", delta_color="off", delta_arrow="off")
+            n[2].metric("B(0)/B0", "1.000", delta_color="off", delta_arrow="off")
+            fig = go.Figure()
+            fig.add_scatter(x=xn * 1e9, y=y_n, mode="lines", name="B",
+                            line={"color": t["analytic"], "width": 3}, hovertemplate="%{y:.4f}")
+            fig.update_xaxes(title="x (nm)", range=[-d_m * 1e9 / 2.0, d_m * 1e9 / 2.0])
+            fig.update_yaxes(title=y_title, range=[0, y_top])
+            live_chart(style(fig, t, 320, uirevision="temp-normal"), key="temp_normal")
+            normal_state_infographic(t)
+            st.caption("Static normal-state limit. The model ignores the AC skin depth. "
+                       "A real sample near Tc can have fluctuations or a mixed state.")
+
+    left_t, right_t = st.columns(2, gap="medium")
+    with left_t, st.container(border=True, key="card_temp_lambda"):
+        st.markdown('<p class="card-title">Penetration depth</p>', unsafe_allow_html=True)
+        live_chart(lambda_chart(t_c, lambda_0_m, t_k, t), key="temp_lambda")
+    with right_t, st.container(border=True, key="card_temp_profile"):
+        st.markdown('<p class="card-title">Field profiles</p>', unsafe_allow_html=True)
+        units_t = st.segmented_control("Temperature units", ["B/B₀", "B (mT)"], default="B/B₀",
+                                       label_visibility="collapsed", key="temp_units") or "B/B₀"
+        live_chart(temperature_profile_chart(t_c, lambda_0_m, d_m, b_0, t_k, units_t, t),
+                   key="temp_family")
+        st.caption("Faint curves: T/Tc = 0, 0.217, 0.435, 0.652, 0.870, 0.957. Bold curve: current T.")
