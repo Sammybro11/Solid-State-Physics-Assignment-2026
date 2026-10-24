@@ -30,6 +30,9 @@ uv run streamlit run src/magpenetration_simulation/app.py
 The page opens at <http://localhost:8501>. Run it from this folder so Streamlit
 picks up the theme in `.streamlit/config.toml`.
 
+All UI ranges, defaults, steps, chart sizes, families, the temperature clamp, and
+the error target are in `src/magpenetration_simulation/ui_config.py`.
+
 ### Navigation
 
 The app has six pages.

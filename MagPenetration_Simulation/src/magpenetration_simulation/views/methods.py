@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from magpenetration_simulation import ui
+from magpenetration_simulation import ui_config as cfg
 from magpenetration_simulation.slab import (
     _grid,
     slab_field_analytic,
@@ -22,7 +23,7 @@ METHODS = {
 }
 SHORT = {"Finite difference": "FD", "Relaxation (SOR)": "SOR", "Shooting": "Shooting"}
 LABEL = {"Analytic": "Analytic", **SHORT}
-TARGET = 1e-3
+TARGET = cfg.METHODS["target"]
 MU0 = 1.25663706212e-6  # vacuum permeability in H/m
 
 
@@ -78,7 +79,7 @@ def profile_chart(r, shown, units, t):
     yf = 1.0 if units == "Scaled" else r["b0"] * 1e3
     fmt = "%{y:.6f}" if units == "Scaled" else "%{y:.4f} mT"
     half = r["dt"] / 2
-    pad = max(0.6, 0.08 * r["dt"])
+    pad = max(cfg.PLOT["x_pad_min"], cfg.PLOT["x_pad_fraction"] * r["dt"])
     fig = go.Figure()
     slab_backdrop(fig, r, t, xf)
     for xs in ([-(half + pad) * xf, -half * xf], [half * xf, (half + pad) * xf]):
@@ -101,7 +102,7 @@ def profile_chart(r, shown, units, t):
         fig.add_scatter(x=x, y=m["b"] * yf, name=SHORT[name], mode="lines",
                         line={"color": t[name], "width": 0}, hovertemplate=fmt)
     fig.update_xaxes(title=x_title, range=[-(half + pad) * xf, (half + pad) * xf])
-    fig.update_yaxes(title="B / B₀" if units == "Scaled" else "B (mT)", range=[0, 1.05 * yf])
+    fig.update_yaxes(title="B / B₀" if units == "Scaled" else "B (mT)", range=[0, cfg.PLOT["y_headroom"] * yf])
     return ui.style(fig, t, ui.CHART_H, uirevision=f"profile-{units}")
 
 
@@ -126,7 +127,8 @@ def error_chart(r, shown, scale, units, t):
     if scale == "Log":
         top = np.log10(yf)
         fig.add_hline(y=TARGET * yf, line={"color": "#ef4444", "dash": "dash", "width": 1})
-        fig.update_yaxes(type="log", range=[top - 16, top], dtick=2, exponentformat="power",
+        fig.update_yaxes(type="log", range=[top - cfg.PLOT["log_decades"], top], dtick=2,
+                         exponentformat="power",
                          title="|B − B_analytic| / B₀" if units == "Scaled" else "|B − B_analytic| (µT)")
     else:
         fig.add_hline(y=0, line={"color": t["axis"], "width": 1})
@@ -154,9 +156,12 @@ def render(material):
     with ui.card("controls"):
         c = st.columns(2, gap="large")
         with c[0]:
-            d_over_lam = ui.live_slider("Slab thickness d/λ", 0.5, 100.0, 5.0, 0.5, "d_over_lam", t, decimals=1)
+            d_cfg = cfg.METHODS["d_over_lam"]
+            d_over_lam = ui.live_slider("Slab thickness d/λ", d_cfg["min"], d_cfg["max"],
+                                        d_cfg["default"], d_cfg["step"], "d_over_lam", t, decimals=1)
         with c[1]:
-            n_points = int(ui.live_slider("Grid points N (odd)", 41, 2001, 401, 20, "n_points", t))
+            n_points = int(ui.live_slider("Grid points N (odd)", cfg.GRID["min"], cfg.GRID["max"],
+                                          cfg.GRID["default"], cfg.GRID["step"], "n_points", t))
 
     if not math.isfinite(lam):
         st.warning("Normal state: λ is infinite, so there is no screening profile to solve.")

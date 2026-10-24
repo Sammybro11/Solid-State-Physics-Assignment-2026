@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from magpenetration_simulation import ui
+from magpenetration_simulation import ui_config as cfg
 from magpenetration_simulation.cylinder import (
     cylinder_center_field,
     cylinder_field_profile,
@@ -16,13 +17,14 @@ from magpenetration_simulation.temperature import lambda_of_temperature
 def near_wall(radius, lam, n_points):
     """Thick-cylinder wall limit sqrt(R/r) * exp(-s/lam) with s = R - r, as r/R and B/B0.
 
-    Only the part of the grid where the limit stays near the field (value < 1.02)
-    is returned; closer to the axis the limit diverges and does not apply.
+    Only the part of the grid where the limit stays near the field, below the
+    CYLINDER["near_wall_clip"] value, is returned; closer to the axis the limit
+    diverges and does not apply.
     """
     r = np.linspace(0.0, radius, n_points)
     with np.errstate(divide="ignore"):
         ref = np.sqrt(radius / r) * np.exp(-(radius - r) / lam)
-    keep = ref <= 1.02
+    keep = ref <= cfg.CYLINDER["near_wall_clip"]
     return r[keep] / radius, ref[keep]
 
 
@@ -32,12 +34,12 @@ def profile_chart(r, b, radius, lam, size, b_0, view, t):
     fig = go.Figure()
     fig.add_scatter(x=r / radius, y=b / b_0 * yf, name="London", mode="lines",
                     line={"color": t["analytic"], "width": 2.6}, hovertemplate="%{y:.4f}")
-    if size >= 10:
+    if size >= cfg.CYLINDER["near_wall_min"]:
         x, y = near_wall(radius, lam, len(r))
         fig.add_scatter(x=x, y=y * yf, mode="lines", hoverinfo="skip",
                         line={"color": t["Shooting"], "width": 1.6, "dash": "dash"})
     fig.update_xaxes(title="r / R")
-    fig.update_yaxes(title="B / B₀" if view == ui.GEOM_VIEWS[0] else "B (mT)", range=[0, 1.05 * yf])
+    fig.update_yaxes(title="B / B₀" if view == ui.GEOM_VIEWS[0] else "B (mT)", range=[0, cfg.PLOT["y_headroom"] * yf])
     return ui.style(fig, t, ui.CHART_H, uirevision=f"cyl-profile-{view}")
 
 
@@ -59,7 +61,7 @@ def flat_chart(b_0, view, t):
     fig.add_scatter(x=[0.0, 1.0], y=[yf, yf], mode="lines", name="B",
                     line={"color": t["analytic"], "width": 2.6}, hovertemplate="%{y:.4f}")
     fig.update_xaxes(title="r / R", range=[0, 1])
-    fig.update_yaxes(title="B / B₀" if view == ui.GEOM_VIEWS[0] else "B (mT)", range=[0, 1.05 * yf])
+    fig.update_yaxes(title="B / B₀" if view == ui.GEOM_VIEWS[0] else "B (mT)", range=[0, cfg.PLOT["y_headroom"] * yf])
     return ui.style(fig, t, ui.CHART_H, uirevision=f"cyl-flat-{view}")
 
 
@@ -79,7 +81,7 @@ def temperature_chart(radius, lambda_0, t_c, b_0, t_k, view, t):
     fig.add_scatter(x=r / radius, y=b / b_0 * yf, name="T", mode="lines",
                     line={"color": t["analytic"], "width": 3}, hovertemplate="%{y:.4f}")
     fig.update_xaxes(title="r / R")
-    fig.update_yaxes(title="B / B₀" if view == ui.GEOM_VIEWS[0] else "B (mT)", range=[0, 1.05 * yf])
+    fig.update_yaxes(title="B / B₀" if view == ui.GEOM_VIEWS[0] else "B (mT)", range=[0, cfg.PLOT["y_headroom"] * yf])
     return ui.style(fig, t, ui.CHART_H, uirevision=f"cyl-temp-{view}")
 
 
@@ -96,9 +98,13 @@ def render(material):
     with ui.card("controls"):
         c = st.columns([1.3, 1.1, 1], gap="large")
         with c[0]:
-            size = float(ui.live_slider("Radius R/λ", 0.5, 20.0, 5.0, 0.5, "c_size", t, decimals=1))
+            size_cfg = cfg.CYLINDER["size"]
+            size = float(ui.live_slider("Radius R/λ", size_cfg["min"], size_cfg["max"],
+                                        size_cfg["default"], size_cfg["step"], "c_size", t,
+                                        decimals=1))
         with c[1]:
-            n_points = int(ui.live_slider("Grid points N (odd)", 41, 2001, 401, 20, "c_points", t))
+            n_points = int(ui.live_slider("Grid points N (odd)", cfg.GRID["min"], cfg.GRID["max"],
+                                          cfg.GRID["default"], cfg.GRID["step"], "c_points", t))
         with c[2]:
             view = st.segmented_control("Units", ui.GEOM_VIEWS, default=ui.GEOM_VIEWS[0],
                                         label_visibility="collapsed", key="c_units") or ui.GEOM_VIEWS[0]
@@ -141,7 +147,7 @@ def render(material):
     with left, ui.card("card_cyl_profile"):
         ui.card_title("Radial profile")
         ui.live_chart(profile_chart(r, b, radius, lam, size, b_0, view, t), key="cyl_profile")
-        if size >= 10:
+        if size >= cfg.CYLINDER["near_wall_min"]:
             st.caption("Dashed: √(R/r)·exp(−s/λ), the thick-cylinder limit near the wall "
                        "(s = R − r, valid for R/λ ≥ 10).")
     with right, ui.card("card_cyl_family"):

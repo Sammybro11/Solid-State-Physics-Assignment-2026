@@ -11,8 +11,11 @@ import math
 
 import streamlit as st
 
-from magpenetration_simulation import ui, views
-from magpenetration_simulation.temperature import clamp_temperature, lambda_of_temperature
+from magpenetration_simulation import ui, ui_config as cfg, views
+from magpenetration_simulation.temperature import (
+    clamp_temperature,
+    lambda_of_temperature,
+)
 
 DEFAULT_PAGE = "theory"
 VIEWS = {
@@ -77,16 +80,20 @@ if clicked:
 
 with st.sidebar:
     st.markdown('<p class="card-title">Material and field</p>', unsafe_allow_html=True)
-    st.number_input("Critical temperature T_c (K)", min_value=1.0, max_value=20.0,
-                    value=9.2, step=0.1, key="g_tc")
-    clamp = float(clamp_temperature(st.session_state.g_tc))
+    t_c_cfg, t_cfg = cfg.SIDEBAR["t_c"], cfg.SIDEBAR["t"]
+    st.number_input("Critical temperature T_c (K)", min_value=t_c_cfg["min"],
+                    max_value=t_c_cfg["max"], value=t_c_cfg["default"],
+                    step=t_c_cfg["step"], key="g_tc")
+    clamp = float(clamp_temperature(st.session_state.g_tc, cfg.TEMPERATURE["clamp_factor"]))
     # A lower T_c leaves the stored T above the new clamp, so pull it down first.
-    st.session_state.setdefault("g_t", min(4.2, clamp))
-    if st.session_state.g_t > clamp:
-        st.session_state.g_t = clamp
-    st.slider("Temperature T (K)", 0.0, clamp, step=0.05, key="g_t")
-    st.slider("Penetration depth λ₀ (nm)", 10, 200, 50, 5, key="g_lam0")
-    st.slider("Applied field B₀ (mT)", 10, 500, 50, 10, key="g_b0")
+    st.session_state.setdefault("g_t", min(t_cfg["default"], clamp))
+    st.session_state.g_t = min(st.session_state.g_t, clamp)
+    st.slider("Temperature T (K)", t_cfg["min"], clamp, step=t_cfg["step"], key="g_t")
+    lam_cfg, b_cfg = cfg.SIDEBAR["lambda_0"], cfg.SIDEBAR["b_0"]
+    st.slider("Penetration depth λ₀ (nm)", lam_cfg["min"], lam_cfg["max"],
+              lam_cfg["default"], lam_cfg["step"], key="g_lam0")
+    st.slider("Applied field B₀ (mT)", b_cfg["min"], b_cfg["max"],
+              b_cfg["default"], b_cfg["step"], key="g_b0")
     st.toggle("Normal state (T > T_c)", value=False, key="g_normal",
               help="Screening vanishes: λ → ∞ and the field is flat at B₀.")
 

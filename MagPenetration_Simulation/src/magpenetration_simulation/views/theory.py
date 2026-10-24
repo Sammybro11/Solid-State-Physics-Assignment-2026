@@ -5,6 +5,7 @@ import math
 import streamlit as st
 
 from magpenetration_simulation import ui
+from magpenetration_simulation import ui_config as cfg
 
 
 def render(material):
@@ -93,8 +94,8 @@ def render(material):
             "screening current is zero."
         )
         st.markdown(
-            "The temperature slider stops at **0.995 T_c**. The clamp keeps λ "
-            "finite. The slab equation then has a solution."
+            f"The temperature slider stops at **{cfg.TEMPERATURE['clamp_factor']:.3f} T_c**. "
+            "The clamp keeps λ finite. The slab equation then has a solution."
         )
 
     with ui.card("card_now"):

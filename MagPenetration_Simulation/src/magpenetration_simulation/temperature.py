@@ -98,19 +98,21 @@ def lambda_curve(t_values, lambda_0, t_c):
                                             lambda_0, t_c), dtype=float)
 
 
-def clamp_temperature(t_c):
+def clamp_temperature(t_c, factor=0.995):
     """
-    Return the clamp value of the temperature slider, 0.995 * t_c.
+    Return the clamp value of the temperature slider, factor * t_c.
 
     Parameters
     ----------
     t_c : float
         Critical temperature in K, positive.
+    factor : float
+        Fraction of t_c that the slider may reach, default 0.995.
 
     Returns
     -------
     float
-        Clamped temperature in K, equal to 0.995 * t_c.
+        Clamped temperature in K, equal to factor * t_c.
 
     Raises
     ------
@@ -119,7 +121,7 @@ def clamp_temperature(t_c):
     """
     if t_c <= 0:
         raise ValueError(f"t_c must be positive, got {t_c}")
-    return 0.995 * t_c
+    return factor * t_c
 
 
 def temperature_profile(x, d, lambda_0, t_c, t, b_0):

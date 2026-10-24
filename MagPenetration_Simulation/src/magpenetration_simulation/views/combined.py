@@ -6,6 +6,7 @@ import numpy as np
 import streamlit as st
 
 from magpenetration_simulation import ui
+from magpenetration_simulation import ui_config as cfg
 from magpenetration_simulation.cylinder import cylinder_center_field, cylinder_mean_field
 
 
@@ -36,11 +37,13 @@ def render(material):
     with ui.card("controls"):
         c = st.columns([1.6, 1.3, 1.1], gap="large")
         with c[0]:
-            size = ui.live_slider("Common size d/λ = R/λ", 0.5, 20.0, 5.0, 0.5,
-                                  "combined_size", t, decimals=1)
+            size_cfg = cfg.COMBINED["size"]
+            size = ui.live_slider("Common size d/λ = R/λ", size_cfg["min"], size_cfg["max"],
+                                  size_cfg["default"], size_cfg["step"], "combined_size", t,
+                                  decimals=1)
         with c[1]:
-            n_points = int(ui.live_slider("Grid points N (odd)", 41, 2001, 401, 20,
-                                          "combined_n", t))
+            n_points = int(ui.live_slider("Grid points N (odd)", cfg.GRID["min"], cfg.GRID["max"],
+                                          cfg.GRID["default"], cfg.GRID["step"], "combined_n", t))
         with c[2]:
             view = st.segmented_control("Units", ui.GEOM_VIEWS, default=ui.GEOM_VIEWS[0],
                                         key="combined_units") or ui.GEOM_VIEWS[0]

@@ -13,6 +13,7 @@ import streamlit as st
 from plotly.offline import get_plotlyjs
 from streamlit.components.v2 import component
 
+from magpenetration_simulation import ui_config as cfg
 from magpenetration_simulation.cylinder import cylinder_field_profile
 from magpenetration_simulation.slab import slab_field_analytic
 from magpenetration_simulation.temperature import (
@@ -21,20 +22,15 @@ from magpenetration_simulation.temperature import (
     lambda_of_temperature,
     temperature_profile,
 )
-
-PAGES = (
-    ("theory", "Theory"),
-    ("methods", "Methods"),
-    ("slab", "Slab"),
-    ("cylinder", "Cylinder"),
-    ("combined", "Combined"),
-    ("sphere", "Sphere"),
+from magpenetration_simulation.ui_config import (
+    CHART_H,
+    FAMILY_T,
+    GEOM_FAMILY,
+    GEOM_VIEWS,
+    PAGES,
+    TEMP_POINTS,
 )
-CHART_H = 480
-TEMP_POINTS = 401
-FAMILY_T = (0.0, 0.217, 0.435, 0.652, 0.870, 0.957)
-GEOM_FAMILY = (1.0, 2.0, 5.0, 10.0, 20.0)  # cylinder R/lambda family
-GEOM_VIEWS = ["B/B₀", "B (mT)"]
+
 SUPERSCRIPT = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
 THEMES = {
     "light": {
@@ -103,7 +99,8 @@ def style(fig, t, height, **layout):
 
 def lambda_chart(t_c, lambda_0_m, t_k, t):
     """Penetration depth against reduced temperature, with the current T marked."""
-    ratio = np.linspace(0.0, clamp_temperature(t_c) / t_c, TEMP_POINTS)
+    factor = cfg.TEMPERATURE["clamp_factor"]
+    ratio = np.linspace(0.0, clamp_temperature(t_c, factor) / t_c, TEMP_POINTS)
     lam = lambda_curve(ratio * t_c, lambda_0_m, t_c) / lambda_0_m
     fig = go.Figure()
     fig.add_scatter(x=ratio, y=lam, mode="lines", name="λ(T)",
@@ -112,7 +109,7 @@ def lambda_chart(t_c, lambda_0_m, t_k, t):
                     mode="markers", hoverinfo="skip",
                     marker={"size": 11, "color": t["card"],
                             "line": {"color": t["Finite difference"], "width": 2}})
-    fig.add_vline(x=0.995, line={"color": t["axis"], "dash": "dot", "width": 1})
+    fig.add_vline(x=factor, line={"color": t["axis"], "dash": "dot", "width": 1})
     fig.update_xaxes(title="T / T_c")
     fig.update_yaxes(title="λ(T) / λ₀")
     return style(fig, t, CHART_H, uirevision="temp-lambda")
@@ -133,7 +130,7 @@ def temperature_profile_chart(t_c, lambda_0_m, d_m, b_0, t_k, units, t):
     fig.add_scatter(x=x * 1e9, y=y, mode="lines", name="T",
                     line={"color": t["analytic"], "width": 3}, hovertemplate="%{y:.4f}")
     fig.update_xaxes(title="x (nm)", range=[-d_m * 1e9 / 2.0, d_m * 1e9 / 2.0])
-    fig.update_yaxes(title="B (mT)" if units == "B (mT)" else "B / B₀", range=[0, 1.05 * yf])
+    fig.update_yaxes(title="B (mT)" if units == "B (mT)" else "B / B₀", range=[0, cfg.PLOT["y_headroom"] * yf])
     return style(fig, t, CHART_H, uirevision=f"temp-family-{units}")
 
 
@@ -163,7 +160,7 @@ def geometry_compare_chart(s, slab, s_cyl, cyl, geometry, view, b0, t):
                               "dash": "solid" if bold else "dot"},
                         hovertemplate="%{y:.4f}")
     fig.update_xaxes(title="s / λ from the nearest face")
-    fig.update_yaxes(title="B / B₀" if view == GEOM_VIEWS[0] else "B (mT)", range=[0, 1.05 * yf])
+    fig.update_yaxes(title="B / B₀" if view == GEOM_VIEWS[0] else "B (mT)", range=[0, cfg.PLOT["y_headroom"] * yf])
     return style(fig, t, CHART_H, uirevision=f"geom-compare-{view}")
 
 
@@ -182,7 +179,7 @@ def cylinder_family_chart(lam, b0, size, view, t):
                   "width": 2.6 if current else 1.3},
             hovertemplate="%{y:.4f}")
     fig.update_xaxes(title="r / R")
-    fig.update_yaxes(title="B / B₀" if view == GEOM_VIEWS[0] else "B (mT)", range=[0, 1.05 * yf])
+    fig.update_yaxes(title="B / B₀" if view == GEOM_VIEWS[0] else "B (mT)", range=[0, cfg.PLOT["y_headroom"] * yf])
     return style(fig, t, CHART_H, uirevision=f"geom-family-{view}")
 
 

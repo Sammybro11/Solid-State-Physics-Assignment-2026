@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from magpenetration_simulation import ui
+from magpenetration_simulation import ui_config as cfg
 from magpenetration_simulation.slab import slab_field_analytic
 
 
@@ -22,7 +23,7 @@ def profile_chart(x_nm, ratio, b_0, units, t):
     fig.add_scatter(x=x_nm, y=ratio * yf, mode="lines", name="B",
                     line={"color": t["analytic"], "width": 2.4}, hovertemplate=fmt)
     fig.update_xaxes(title="x (nm)", range=[x_nm[0], x_nm[-1]])
-    fig.update_yaxes(title="B (mT)" if units == "B (mT)" else "B / B₀", range=[0, 1.05 * yf])
+    fig.update_yaxes(title="B (mT)" if units == "B (mT)" else "B / B₀", range=[0, cfg.PLOT["y_headroom"] * yf])
     return ui.style(fig, t, ui.CHART_H, uirevision=f"slab-profile-{units}")
 
 
@@ -55,9 +56,12 @@ def render(material):
     with ui.card("controls"):
         c = st.columns([1, 1, 0.7], gap="large", vertical_alignment="bottom")
         with c[0]:
-            d_over_lam = ui.live_slider("Slab thickness d/λ", 0.5, 100.0, 5.0, 0.5, "d_over_lam", t, decimals=1)
+            d_cfg = cfg.SLAB["d_over_lam"]
+            d_over_lam = ui.live_slider("Slab thickness d/λ", d_cfg["min"], d_cfg["max"],
+                                        d_cfg["default"], d_cfg["step"], "d_over_lam", t, decimals=1)
         with c[1]:
-            n_points = int(ui.live_slider("Grid points N (odd)", 41, 2001, 401, 20, "n_points", t))
+            n_points = int(ui.live_slider("Grid points N (odd)", cfg.GRID["min"], cfg.GRID["max"],
+                                          cfg.GRID["default"], cfg.GRID["step"], "n_points", t))
         units = c[2].segmented_control("Units", ui.GEOM_VIEWS, default=ui.GEOM_VIEWS[0],
                                        key="slab_units") or ui.GEOM_VIEWS[0]
 
