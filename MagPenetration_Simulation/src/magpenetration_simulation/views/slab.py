@@ -24,7 +24,7 @@ def profile_chart(x_nm, ratio, b_0, units, t):
                     line={"color": t["analytic"], "width": 2.4}, hovertemplate=fmt)
     fig.update_xaxes(title="x (nm)", range=[x_nm[0], x_nm[-1]])
     fig.update_yaxes(title="B (mT)" if units == "B (mT)" else "B / B₀", range=[0, cfg.PLOT["y_headroom"] * yf])
-    return ui.style(fig, t, ui.CHART_H, uirevision=f"slab-profile-{units}")
+    return ui.style(fig, t, ui.CHART_H, uirevision=f"slab-profile-{units}-{x_nm[0]:.6e}-{x_nm[-1]:.6e}")
 
 
 def normal_view(t, b_0, lambda_0, d_over_lam, n_points, units):
@@ -103,3 +103,4 @@ def render(material):
         ui.card_title("Temperature family")
         ui.live_chart(ui.temperature_profile_chart(t_c, lambda_0, d, b_0, t_k, units, t),
                       key="slab_family")
+        st.caption("All temperatures meet at B₀ at both faces. The current T is bold.")

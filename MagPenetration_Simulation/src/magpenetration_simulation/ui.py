@@ -131,7 +131,7 @@ def temperature_profile_chart(t_c, lambda_0_m, d_m, b_0, t_k, units, t):
                     line={"color": t["analytic"], "width": 3}, hovertemplate="%{y:.4f}")
     fig.update_xaxes(title="x (nm)", range=[-d_m * 1e9 / 2.0, d_m * 1e9 / 2.0])
     fig.update_yaxes(title="B (mT)" if units == "B (mT)" else "B / B₀", range=[0, cfg.PLOT["y_headroom"] * yf])
-    return style(fig, t, CHART_H, uirevision=f"temp-family-{units}")
+    return style(fig, t, CHART_H, uirevision=f"temp-family-{units}-{d_m:.6e}")
 
 
 def geometry_curves(size, lam, b0, n_points):
@@ -161,7 +161,7 @@ def geometry_compare_chart(s, slab, s_cyl, cyl, geometry, view, b0, t):
                         hovertemplate="%{y:.4f}")
     fig.update_xaxes(title="s / λ from the nearest face")
     fig.update_yaxes(title="B / B₀" if view == GEOM_VIEWS[0] else "B (mT)", range=[0, cfg.PLOT["y_headroom"] * yf])
-    return style(fig, t, CHART_H, uirevision=f"geom-compare-{view}")
+    return style(fig, t, CHART_H, uirevision=f"geom-compare-{view}-{s[-1]:.6e}")
 
 
 def cylinder_family_chart(lam, b0, size, view, t):

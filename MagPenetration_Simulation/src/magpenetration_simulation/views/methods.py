@@ -103,7 +103,7 @@ def profile_chart(r, shown, units, t):
                         line={"color": t[name], "width": 0}, hovertemplate=fmt)
     fig.update_xaxes(title=x_title, range=[-(half + pad) * xf, (half + pad) * xf])
     fig.update_yaxes(title="B / B₀" if units == "Scaled" else "B (mT)", range=[0, cfg.PLOT["y_headroom"] * yf])
-    return ui.style(fig, t, ui.CHART_H, uirevision=f"profile-{units}")
+    return ui.style(fig, t, ui.CHART_H, uirevision=f"profile-{units}-{r['dt']:.3f}")
 
 
 def error_chart(r, shown, scale, units, t):
@@ -136,7 +136,7 @@ def error_chart(r, shown, scale, units, t):
                          exponentformat="power",
                          title="(B − B_analytic) / B₀" if units == "Scaled" else "B − B_analytic (µT)")
     fig.update_xaxes(title=x_title)
-    return ui.style(fig, t, ui.CHART_H, uirevision=f"error-{units}-{scale}")
+    return ui.style(fig, t, ui.CHART_H, uirevision=f"error-{units}-{scale}-{r['dt']:.3f}")
 
 
 def render(material):
