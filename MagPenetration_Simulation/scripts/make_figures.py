@@ -3,8 +3,9 @@
 Runs the four slab methods at the agreed defaults, prints the maximum error of
 each numerical method against the analytic answer, writes the slab figures to
 docs/figures/, writes the temperature lambda and profile figures, checks the
-temperature guard numbers, and exits with status 1 if any error exceeds the
-1e-3 target or a guard leaves its bound.
+temperature guard numbers, writes the cylinder geometry figures, checks the
+cylinder and slab acceptance values, and exits with status 1 if any error
+exceeds the 1e-3 target or a guard leaves its bound.
 
 Run from MagPenetration_Simulation/ with:
     uv run python scripts/make_figures.py
@@ -18,7 +19,14 @@ import matplotlib
 matplotlib.use("Agg")  # write files only; never open a window
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.special import i0, i1
 
+from magpenetration_simulation.cylinder import (
+    cylinder_center_field,
+    cylinder_field_analytic,
+    cylinder_field_profile,
+    cylinder_mean_field,
+)
 from magpenetration_simulation.slab import (
     _grid,
     slab_field_analytic,
@@ -40,6 +48,23 @@ D = 5 * LAM        # slab thickness, m
 B0 = 50e-3         # applied field, T
 N_POINTS = 401     # grid points
 TARGET = 1e-3      # maximum allowed relative error
+
+# Geometry defaults (SI units). T = 0 K, so lambda = LAM exactly.
+SIZE = 5                      # slab d/lambda and cylinder R/lambda
+FAMILY_R = (1.0, 2.0, 5.0, 10.0, 20.0)   # cylinder R/lambda family
+
+# Acceptance values from the report, as B/B0 ratios
+CENTER_5 = 0.0367108923
+MEAN_5 = 0.3573532548
+CENTER_20 = 2.2957746294e-8
+MEAN_20 = 0.0974670508
+SLAB_CENTER_5 = 0.1630712319
+SLAB_MEAN_5 = 0.3946457193
+VALUE_TOL = 1e-9              # decimal places printed in the report
+WALL_TOL = 1e-12              # surface field must equal B0
+SCALED_TOL = 1e-12            # scaled Bessel forms vs direct ratios
+WALL_FORM_TOL = 1e-3          # near-wall approximation
+WALL_FORM_S = (0.5, 1.0, 2.0)
 
 # Temperature defaults (SI units), separate from the slab defaults above
 TC = 9.2                 # K
@@ -174,6 +199,104 @@ def temperature_profiles_figure(path):
     fig.savefig(path, dpi=200)
     plt.close(fig)
 
+def tidy(ax):
+    """Grid below the data, top and right spines off."""
+    ax.grid(color="#e5e7eb", lw=0.8)
+    ax.set_axisbelow(True)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+
+
+def cylinder_family_figure(path):
+    """B/B0 against r/R for the R/lambda family, at T = 0 K so lambda = LAM."""
+    cmap = matplotlib.colormaps["viridis"]
+    fig, ax = plt.subplots(figsize=(7, 4.2), layout="constrained")
+    for k, f in enumerate(FAMILY_R):
+        r, b = cylinder_field_profile(f * LAM, LAM, B0, N_POINTS)
+        ax.plot(r / (f * LAM), b / B0, color=cmap(k / (len(FAMILY_R) - 1)), lw=1.8,
+                label=rf"$R/\lambda = {f:g}$")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1.05)
+    ax.set_xlabel(r"$r/R$")
+    ax.set_ylabel(r"$B/B_0$")
+    tidy(ax)
+    ax.set_title(rf"Cylinder field family, $\lambda = {LAM * 1e9:g}$ nm", fontsize=11)
+    ax.legend(frameon=False, loc="upper left", fontsize=9)
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+
+
+def geometry_comparison_figure(path):
+    """Slab and cylinder B/B0 against depth from the nearest face, d = R = SIZE * lambda."""
+    d = SIZE * LAM
+    s = np.linspace(0.0, SIZE / 2, N_POINTS)
+    slab = slab_field_analytic(d / 2 - s * LAM, d, LAM, B0) / B0
+    r, b = cylinder_field_profile(d, LAM, B0, N_POINTS)
+    fig, ax = plt.subplots(figsize=(7, 4.2), layout="constrained")
+    ax.plot(s, slab, color="#2563eb", lw=2, label=r"Slab, $d = 5\lambda$")
+    ax.plot(SIZE - r / LAM, b / B0, color="#059669", lw=2, ls="--", label=r"Cylinder, $R = 5\lambda$")
+    ax.set_xlim(0, SIZE)
+    ax.set_ylim(0, 1.05)
+    ax.set_xlabel(r"$s/\lambda$ from the nearest face")
+    ax.set_ylabel(r"$B/B_0$")
+    tidy(ax)
+    ax.set_title(rf"Slab vs cylinder, $\lambda = {LAM * 1e9:g}$ nm, size $= {SIZE:g}\lambda$",
+                 fontsize=11)
+    ax.legend(frameon=False, loc="upper right", fontsize=9)
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+
+
+def geometry_checks():
+    """Return the labels of every geometry check that leaves its bound."""
+    x_5, x_20, x_50 = 5.0, 20.0, 50.0
+    failed = []
+
+    def compare(label, value, target, tol):
+        ok = bool(abs(value - target) <= tol)
+        print(f"{label:<40}{value:>22.10g}{target:>22.10g}   {'pass' if ok else 'FAIL'}")
+        if not ok:
+            failed.append(label)
+
+    wall = max(abs(cylinder_field_analytic(f * LAM, f * LAM, LAM, B0) / B0 - 1.0) for f in FAMILY_R)
+    print(f"Geometry defaults: lambda = {LAM * 1e9:g} nm, B0 = {B0 * 1e3:g} mT, "
+          f"size = {SIZE:g} lambda, N = {N_POINTS}")
+    print(f"{'Check':<40}{'value':>22}{'expected':>22}   result")
+    compare("wall B(R)/B0 - 1 (max, R/lambda family)", wall, 0.0, WALL_TOL)
+    compare(f"cylinder centre, R = {x_5:g} lambda", cylinder_center_field(x_5 * LAM, LAM, B0) / B0,
+            CENTER_5, VALUE_TOL)
+    compare(f"cylinder mean, R = {x_5:g} lambda", cylinder_mean_field(x_5 * LAM, LAM, B0) / B0,
+            MEAN_5, VALUE_TOL)
+    compare(f"cylinder centre, R = {x_20:g} lambda", cylinder_center_field(x_20 * LAM, LAM, B0) / B0,
+            CENTER_20, VALUE_TOL)
+    compare(f"cylinder mean, R = {x_20:g} lambda", cylinder_mean_field(x_20 * LAM, LAM, B0) / B0,
+            MEAN_20, VALUE_TOL)
+
+    d_slab = x_5 * LAM
+    compare(f"slab centre, d = {x_5:g} lambda", slab_field_analytic(0.0, d_slab, LAM, B0) / B0,
+            SLAB_CENTER_5, VALUE_TOL)
+    compare(f"slab mean, d = {x_5:g} lambda",
+            2.0 / x_5 * np.tanh(x_5 / 2.0), SLAB_MEAN_5, VALUE_TOL)
+
+    radius = x_20 * LAM
+    for s in WALL_FORM_S:
+        bessel = cylinder_field_analytic(radius - s * LAM, radius, LAM, B0) / B0
+        approx = np.sqrt(x_20 / (x_20 - s)) * np.exp(-s)
+        compare(f"near-wall form, R = {x_20:g} lambda, s/lambda = {s:g}", approx, bessel,
+                WALL_FORM_TOL)
+
+    # The scaled forms must reproduce the direct Bessel ratios where those still fit.
+    x = x_50
+    bessel_mean = (2.0 / x) * i1(x) / i0(x)
+    compare(f"scaled mean vs direct ratios, R/lambda = {x:g}",
+            cylinder_mean_field(x * LAM, LAM, B0) / B0, bessel_mean, SCALED_TOL)
+    compare(f"scaled field vs direct ratios, R/lambda = {x:g}",
+            cylinder_field_analytic(0.5 * x * LAM, x * LAM, LAM, B0) / B0,
+            i0(0.5 * x) / i0(x), SCALED_TOL)
+
+    return failed
+
+
 def main():
     x, exact, fields = run_methods()
 
@@ -223,14 +346,24 @@ def main():
     print(f"Wrote {FIG_DIR / 'temperature_lambda.png'}")
     print(f"Wrote {FIG_DIR / 'temperature_profiles.png'}")
 
+    print()
+    geom_failed = geometry_checks()
+    cylinder_family_figure(FIG_DIR / "geometry_cylinder.png")
+    geometry_comparison_figure(FIG_DIR / "geometry_comparison.png")
+    print(f"Wrote {FIG_DIR / 'geometry_cylinder.png'}")
+    print(f"Wrote {FIG_DIR / 'geometry_comparison.png'}")
+
     if failed:
         print(f"FAIL: {', '.join(failed)} above the {TARGET:g} target", file=sys.stderr)
     if guard_failed:
         print(f"FAIL: {', '.join(guard_failed)} outside bound", file=sys.stderr)
-    if failed or guard_failed:
+    if geom_failed:
+        print(f"FAIL: {', '.join(geom_failed)} outside bound", file=sys.stderr)
+    if failed or guard_failed or geom_failed:
         sys.exit(1)
     print(f"All three methods within the {TARGET:g} target.")
     print("Temperature guards within bound.")
+    print("Geometry checks within bound.")
 
 if __name__ == "__main__":
     main()

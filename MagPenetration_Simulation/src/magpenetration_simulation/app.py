@@ -1,4 +1,7 @@
-"""Streamlit page for the 1D slab London-equation model.
+"""Streamlit page for the London-equation penetration models.
+
+Covers the 1D slab at zero temperature, the two-fluid temperature dependence,
+and a geometry tab that compares the slab with the axial infinite cylinder.
 
 Run from MagPenetration_Simulation/ with:
     uv run streamlit run src/magpenetration_simulation/app.py
@@ -12,6 +15,11 @@ import streamlit as st
 from plotly.offline import get_plotlyjs
 from streamlit.components.v2 import component
 
+from magpenetration_simulation.cylinder import (
+    cylinder_center_field,
+    cylinder_field_profile,
+    cylinder_mean_field,
+)
 from magpenetration_simulation.slab import (
     _grid,
     slab_field_analytic,
@@ -41,6 +49,8 @@ SUPERSCRIPT = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
 
 FAMILY_T = (0.0, 0.217, 0.435, 0.652, 0.870, 0.957)
 TEMP_POINTS = 401
+GEOM_FAMILY = (1.0, 2.0, 5.0, 10.0, 20.0)  # cylinder R/lambda family
+GEOM_VIEWS = ["B/B₀", "B (mT)"]
 THEMES = {
     "light": {
         "bg": "#f7f8fa", "card": "#ffffff", "border": "#e6e8ec", "text": "#0f172a",
@@ -250,6 +260,55 @@ def temperature_profile_chart(t_c, lambda_0_m, d_m, b_0, t_k, units, theme):
     return style(fig, theme, CHART_H, uirevision=f"temp-family-{units}")
 
 
+def geometry_curves(size, lam, b0, n_points):
+    """Slab and cylinder fields at the same size, d = R = size * lam.
+
+    Returns s/lam for each curve, both measured from the nearest face, with the
+    fields as B/B0. The slab curve stops at its centre, s = size/2; the
+    cylinder curve reaches its axis, s = size.
+    """
+    d = size * lam
+    s = np.linspace(0.0, size / 2.0, n_points)
+    slab = slab_field_analytic(d / 2.0 - s * lam, d, lam, b0) / b0
+    r, cyl = cylinder_field_profile(d, lam, b0, n_points)
+    return s, slab, size - r[::-1] / lam, cyl[::-1] / b0
+
+
+def geometry_compare_chart(s, slab, s_cyl, cyl, geometry, view, b0, theme):
+    """Slab and cylinder B/B0 against depth from the nearest face, selected geometry in bold."""
+    yf = 1.0 if view == GEOM_VIEWS[0] else b0 * 1e3
+    fig = go.Figure()
+    for name, xs, ys, color in (("Slab", s, slab, theme["Finite difference"]),
+                                ("Cylinder", s_cyl, cyl, theme["Shooting"])):
+        bold = name == geometry
+        fig.add_scatter(x=xs, y=ys * yf, name=name, mode="lines",
+                        line={"color": color, "width": 2.6 if bold else 1.6,
+                              "dash": "solid" if bold else "dot"},
+                        hovertemplate="%{y:.4f}")
+    fig.update_xaxes(title="s / λ from the nearest face")
+    fig.update_yaxes(title="B / B₀" if view == GEOM_VIEWS[0] else "B (mT)", range=[0, 1.05 * yf])
+    return style(fig, theme, CHART_H, uirevision=f"geom-compare-{view}")
+
+
+def cylinder_family_chart(lam, b0, size, view, theme):
+    """Cylinder B/B0 against r/R for the R/lambda family, current size in bold."""
+    yf = 1.0 if view == GEOM_VIEWS[0] else b0 * 1e3
+    last = len(GEOM_FAMILY) - 1
+    fig = go.Figure()
+    for i, f in enumerate(GEOM_FAMILY):
+        r, b = cylinder_field_profile(f * lam, lam, b0, TEMP_POINTS)
+        current = f == size
+        fig.add_scatter(
+            x=r / (f * lam), y=b / b0 * yf, name=f"R/λ = {f:g}", mode="lines",
+            line={"color": theme["Shooting"] if current else
+                  _alpha(theme["Shooting"], 0.2 + 0.5 * i / last),
+                  "width": 2.6 if current else 1.3},
+            hovertemplate="%{y:.4f}")
+    fig.update_xaxes(title="r / R")
+    fig.update_yaxes(title="B / B₀" if view == GEOM_VIEWS[0] else "B (mT)", range=[0, 1.05 * yf])
+    return style(fig, theme, CHART_H, uirevision=f"geom-family-{view}")
+
+
 def normal_state_infographic(theme):
     """Explain, in three steps, why B is flat above Tc. Colours come from inject_css."""
     steps = (
@@ -393,7 +452,7 @@ def inject_css(t):
     .stApp .app-title {{text-align: center; font-size: 2rem !important; font-weight: 700; color: {t['text']};
         letter-spacing: -0.02em; line-height: 1.2; margin: 0.1rem 0 0.5rem 0;}}
     .stApp .card-title {{font-weight: 650; font-size: 1rem !important; color: {t['text']}; margin: 0;}}
-    .st-key-controls, .st-key-card_profile, .st-key-card_error, .st-key-card_normal, .st-key-card_temp_lambda, .st-key-card_temp_profile {{background: {t['card']};
+    .st-key-controls, .st-key-geom_controls, .st-key-card_profile, .st-key-card_error, .st-key-card_normal, .st-key-card_temp_lambda, .st-key-card_temp_profile, .st-key-card_geom_compare, .st-key-card_geom_family {{background: {t['card']};
         border-color: {t['border']} !important;}}
     .st-key-controls {{padding-top: 0.6rem; padding-bottom: 0.2rem;}}
     [data-testid="stMetric"] {{background: {t['card']}; border: 1px solid {t['border']};
@@ -425,7 +484,7 @@ def inject_css(t):
 
 # ---------------------------------------------------------------- page
 
-st.set_page_config(page_title="London slab model", layout="wide")
+st.set_page_config(page_title="London penetration model", layout="wide")
 if "theme" not in st.session_state:
     st.session_state.theme = "light"
 
@@ -436,9 +495,9 @@ if choice:
     st.session_state.theme = "light" if choice == ":material/light_mode:" else "dark"
 t = THEMES[st.session_state.theme]
 inject_css(t)
-st.markdown('<div class="app-title">Field penetration into a superconducting slab</div>',
+st.markdown('<div class="app-title">Field penetration: slab, temperature, and cylinder</div>',
             unsafe_allow_html=True)
-slab_tab, temp_tab = st.tabs(["Slab", "Temperature"])
+slab_tab, temp_tab, geom_tab = st.tabs(["Slab", "Temperature", "Geometry"])
 
 with slab_tab:
     with st.container(border=True, key="controls"):
@@ -587,3 +646,74 @@ with temp_tab:
         live_chart(temperature_profile_chart(t_c, lambda_0_m, d_m, b_0, t_k, units_t, t),
                    key="temp_family")
         st.caption("Faint curves: T/Tc = 0, 0.217, 0.435, 0.652, 0.870, 0.957. Bold curve: current T.")
+
+
+with geom_tab:
+    with st.container(border=True, key="geom_controls"):
+        geometry = st.segmented_control("Geometry", ["Slab", "Cylinder"], default="Cylinder",
+                                        key="geom_kind") or "Cylinder"
+        gtc_col, gt_col, glam_col, gb_col, gsize_col, gn_col = st.columns(6, gap="large")
+        with gtc_col:
+            geom_tc = st.number_input("Critical temperature T_c (K)", min_value=1.0, max_value=20.0,
+                                      value=9.2, step=0.1, key="geom_tc")
+        gclamp = float(clamp_temperature(geom_tc))
+        if "geom_t" in st.session_state and st.session_state.geom_t > gclamp:
+            st.session_state.geom_t = gclamp
+        with gt_col:
+            geom_t = st.slider("Temperature T (K)", 0.0, gclamp, min(4.2, gclamp), 0.05, key="geom_t")
+        with glam_col:
+            geom_lam0_nm = st.slider("Penetration depth λ₀ (nm)", 10, 200, 50, 5, key="geom_lam0")
+        with gb_col:
+            geom_b0_mT = st.slider("Applied field B₀ (mT)", 10, 500, 50, 10, key="geom_b0")
+        with gsize_col:
+            geom_size = st.slider("Size d/λ or R/λ", 0.5, 100.0, 5.0, 0.5, key="geom_size")
+        with gn_col:
+            geom_n = int(st.slider("Grid points N (odd)", 41, 2001, 401, 20, key="geom_n"))
+
+    geom_lam0 = geom_lam0_nm * 1e-9
+    geom_b0 = geom_b0_mT * 1e-3
+    geom_lam = lambda_of_temperature(geom_t, geom_lam0, geom_tc)
+    geom_len = geom_size * geom_lam
+
+    if geometry == "Cylinder":
+        center_f = cylinder_center_field(geom_len, geom_lam, geom_b0)
+        mean_f = cylinder_mean_field(geom_len, geom_lam, geom_b0)
+    else:
+        center_f = slab_field_analytic(0.0, geom_len, geom_lam, geom_b0)
+        mean_f = geom_b0 * (2.0 * geom_lam / geom_len) * np.tanh(geom_len / (2.0 * geom_lam))
+    center_fraction = center_f / geom_b0
+    mean_fraction = mean_f / geom_b0
+
+    k = st.columns(4)
+    k[0].metric("Penetration depth λ(T)", f"{geom_lam * 1e9:.1f} nm",
+                f"{geom_lam / geom_lam0:.2f} λ₀", delta_color="off", delta_arrow="off",
+                help="Two-fluid law: λ(T) = λ₀ / sqrt(1 - (T/T_c)⁴).")
+    k[1].metric("Centre field B(0)", field_text(center_f), f"{center_fraction:.3g} B₀",
+                delta_color="off", delta_arrow="off",
+                help="Slab: B₀ / cosh(d/2λ). Cylinder: B₀ / I₀(R/λ).")
+    k[2].metric("Mean field ⟨B⟩", field_text(mean_f), f"{mean_fraction:.3g} B₀",
+                delta_color="off", delta_arrow="off",
+                help="Slab: B₀ (2λ/d) tanh(d/2λ). Cylinder: B₀ (2λ/R) I₁(R/λ) / I₀(R/λ).")
+    k[3].metric("Screened fraction", f"{1.0 - center_fraction:.3f}", "1 − B(0)/B₀",
+                delta_color="off", delta_arrow="off",
+                help="Fraction of the applied field removed at the centre.")
+
+    if geom_size < 1:
+        st.warning(f"{geometry} size {geom_size:g} λ is below 1 λ, so the sample screens weakly. "
+                   "The centre field is close to B₀.")
+
+    s_slab, slab_curve, s_cyl, cyl_curve = geometry_curves(geom_size, geom_lam, geom_b0, geom_n)
+    left_g, right_g = st.columns(2, gap="medium")
+    with left_g, st.container(border=True, key="card_geom_compare"):
+        a, b = st.columns([1.5, 1], vertical_alignment="center")
+        a.markdown('<p class="card-title">Slab vs cylinder</p>', unsafe_allow_html=True)
+        view_g = b.segmented_control("Geometry units", GEOM_VIEWS, default=GEOM_VIEWS[0],
+                                     label_visibility="collapsed", key="geom_units") or GEOM_VIEWS[0]
+        live_chart(geometry_compare_chart(s_slab, slab_curve, s_cyl, cyl_curve, geometry,
+                                          view_g, geom_b0, t), key="geom_compare")
+        st.caption(f"Both at {geom_size:g} λ ({geometry.lower()} in bold). "
+                   "The slab curve stops at its centre, s = d/2.")
+    with right_g, st.container(border=True, key="card_geom_family"):
+        st.markdown('<p class="card-title">Cylinder family</p>', unsafe_allow_html=True)
+        live_chart(cylinder_family_chart(geom_lam, geom_b0, geom_size, view_g, t), key="geom_family")
+        st.caption("R/λ = 1, 2, 5, 10, 20. The curve for the current size is bold when it is in the family.")
