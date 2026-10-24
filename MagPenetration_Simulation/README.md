@@ -315,3 +315,14 @@ The geometry functions take $\lambda$ directly.
 The material card on each page supplies $\lambda(T)$.
 The theory is in
 [`docs/q6_temperature_theory.md`](docs/q6_temperature_theory.md).
+
+## Reports
+
+The documents are in `docs/`.
+
+- Final report: [`docs/q6_final_report.md`](docs/q6_final_report.md), and the built PDF at [`docs/q6_final_report.pdf`](docs/q6_final_report.pdf).
+- Geometry models: [`docs/q6_geometry_models.md`](docs/q6_geometry_models.md).
+- Simulation techniques: [`docs/q6_simulation_techniques.md`](docs/q6_simulation_techniques.md).
+- Temperature theory: [`docs/q6_temperature_theory.md`](docs/q6_temperature_theory.md), and the built PDF at [`docs/q6_temperature_theory.pdf`](docs/q6_temperature_theory.pdf).
+
+The final report combines the three source documents. It describes the theory, the numerical methods, the geometry models, and the app in one argument.

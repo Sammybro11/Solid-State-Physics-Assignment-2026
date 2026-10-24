@@ -67,7 +67,7 @@ N_POINTS = 401     # grid points
 TARGET = 1e-3      # maximum allowed relative error
 
 # Geometry defaults (SI units). T = 0 K, so lambda = LAM exactly.
-SIZE = 5                      # slab d/lambda and cylinder R/lambda
+SIZE = 5                      # common half-size, s/lambda = d/(2 lambda) = R/lambda
 FAMILY_R = (1.0, 2.0, 5.0, 10.0, 20.0)   # cylinder R/lambda family
 
 # Acceptance values from the report, as B/B0 ratios
@@ -265,21 +265,23 @@ def cylinder_family_figure(path):
 
 
 def geometry_comparison_figure(path):
-    """Slab and cylinder B/B0 against depth from the nearest face, d = R = SIZE * lambda."""
-    d = SIZE * LAM
-    s = np.linspace(0.0, SIZE / 2, N_POINTS)
+    """Slab and cylinder B/B0 against depth from the nearest face, at the common half-size
+    s/lambda = d/(2 lambda) = R/lambda = SIZE, so both curves end at the middle."""
+    d = 2 * SIZE * LAM
+    s = np.linspace(0.0, SIZE, N_POINTS)
     slab = slab_field_analytic(d / 2 - s * LAM, d, LAM, B0) / B0
-    r, b = cylinder_field_profile(d, LAM, B0, N_POINTS)
+    r, b = cylinder_field_profile(SIZE * LAM, LAM, B0, N_POINTS)
     fig, ax = plt.subplots(figsize=(7, 4.2), layout="constrained")
-    ax.plot(s, slab, color="#2563eb", lw=2, label=r"Slab, $d = 5\lambda$")
-    ax.plot(SIZE - r / LAM, b / B0, color="#059669", lw=2, ls="--", label=r"Cylinder, $R = 5\lambda$")
+    ax.plot(s, slab, color="#2563eb", lw=2, label=rf"Slab, $d = {2 * SIZE:g}\lambda$")
+    ax.plot(SIZE - r / LAM, b / B0, color="#059669", lw=2, ls="--",
+            label=rf"Cylinder, $R = {SIZE:g}\lambda$")
     ax.set_xlim(0, SIZE)
     ax.set_ylim(0, 1.05)
     ax.set_xlabel(r"$s/\lambda$ from the nearest face")
     ax.set_ylabel(r"$B/B_0$")
     tidy(ax)
-    ax.set_title(rf"Slab vs cylinder, $\lambda = {LAM * 1e9:g}$ nm, size $= {SIZE:g}\lambda$",
-                 fontsize=11)
+    ax.set_title(rf"Slab vs cylinder at $s/\lambda = d/(2\lambda) = R/\lambda = {SIZE:g}$, "
+                 rf"$\lambda = {LAM * 1e9:g}$ nm", fontsize=11)
     ax.legend(frameon=False, loc="upper right", fontsize=9)
     fig.savefig(path, dpi=200)
     plt.close(fig)
