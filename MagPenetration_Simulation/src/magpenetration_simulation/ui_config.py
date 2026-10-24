@@ -6,7 +6,7 @@ Colours and CSS stay in `ui.py`.
 """
 
 # Each widget group: min, max, default and step. No max means the clamp sets it.
-SIDEBAR = {
+MATERIAL = {
     "t_c": {"min": 1.0, "max": 20.0, "default": 9.2, "step": 0.1},
     "t": {"min": 0.0, "default": 4.2, "step": 0.05},
     "lambda_0": {"min": 10, "max": 200, "default": 50, "step": 5},
@@ -20,26 +20,30 @@ METHODS = {
 }
 SLAB = {
     "d_over_lam": {"min": 0.5, "max": 20.0, "default": 5.0, "step": 0.5},
+    "d_nm": {"min": 5, "max": 2000, "default": 250, "step": 5},
 }
-# near_wall_min and near_wall_clip set when the thick-cylinder limit is drawn.
 CYLINDER = {
     "size": {"min": 0.5, "max": 20.0, "default": 5.0, "step": 0.5},
-    "near_wall_min": 10.0,
-    "near_wall_clip": 1.02,
+    "r_nm": {"min": 5, "max": 2000, "default": 250, "step": 5},
 }
 SPHERE = {
     "size": {"min": 0.5, "max": 20.0, "default": 5.0, "step": 0.5},
+    "r_nm": {"min": 5, "max": 2000, "default": 250, "step": 5},
 }
 FINITE_BODY = {
     "width": {"min": 0.5, "max": 20.0, "default": 5.0, "step": 0.5},
     "height": {"min": 0.5, "max": 20.0, "default": 5.0, "step": 0.5},
+    "width_nm": {"min": 5, "max": 2000, "default": 250, "step": 5},
+    "height_nm": {"min": 5, "max": 2000, "default": 250, "step": 5},
     "n": {"min": 41, "max": 201, "default": 81, "step": 20},
 }
 FILM = {
     "thickness": {"min": 0.1, "max": 10.0, "default": 1.0, "step": 0.1},
+    "d_nm": {"min": 1, "max": 1000, "default": 50, "step": 1},
 }
 COMBINED = {
     "size": {"min": 0.5, "max": 20.0, "default": 5.0, "step": 0.5},
+    "size_nm": {"min": 5, "max": 2000, "default": 250, "step": 5},
 }
 # y_headroom and x_pad_* set the chart axis padding; log_decades sets the error axis.
 PLOT = {
@@ -49,6 +53,8 @@ PLOT = {
     "log_decades": 16,
 }
 CHART_H = 480
+# height: section charts; points: grid per axis; line_seeds: field lines per section.
+VIS = {"height": 460, "points": 161, "line_seeds": 9, "margin": 1.7}
 TEMP_POINTS = 401
 FAMILY_T = (0.0, 0.217, 0.435, 0.652, 0.870, 0.957)
 GEOM_FAMILY = (1.0, 2.0, 5.0, 10.0, 20.0)

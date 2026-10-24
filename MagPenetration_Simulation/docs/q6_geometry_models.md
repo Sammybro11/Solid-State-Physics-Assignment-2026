@@ -291,18 +291,51 @@ The screening currents then spread over $\Lambda$, and the field concentrates at
   A click on the title returns to Theory.
 - The top navigation bar shows eight pages.
   The order is Theory, Methods, Slab, Cylinder, Sphere, Finite body, Film, and Combined.
-- The sidebar sets $T$, $T_c$, $\lambda_0$, and $B_0$, and it holds the normal-state toggle and the theme switch.
+- Each page draws its own Material and field card.
+  The card sets $T$, $T_c$, $\lambda_0$, and $B_0$, and it holds the normal-state toggle.
+  The pages do not share these values.
+- The light and dark theme switch is in the header.
 - The slider stops at $0.995\,T_c$, so $\lambda(T)$ keeps a finite value.
-- Each page sets its own size, $d/\lambda$ or $R/\lambda$, and its own $N$.
+- Each page sets its own size in nm or in $\lambda$, and its own $N$.
+  A Size by switch picks the mode.
 - The app has no Temperature tab.
-  The geometry pages take $\lambda(T)$ from the sidebar.
+  Each geometry page takes $\lambda(T)$ from its own material card.
 - The Sphere page shows the exact vector solution and its metric cards.
 - The Finite body page solves the 2D scalar rectangle.
 - The Film page shows the Pearl length, the regime, and the parallel profile.
-- The 2D field-line view and the field-magnitude view are a separate slice.
+- The visualization layer draws the field map of each page.
 
 The Slab page warns when $d < 2\lambda$ and shows $\Lambda = 2\lambda^2/d$.
-The Combined page plots $B/B_0$ against $s/\lambda$ for both closed forms.
+The Combined page plots $B/B_0$ against $s/\lambda$ for five geometries.
+
+### Visualization layer
+
+[`visualization.py`](../src/magpenetration_simulation/visualization.py) draws the field map of each page.
+
+- The slab, cylinder, and film pages draw a longitudinal section.
+  The field lines are straight and follow the field axis.
+  The heatmap shows $|B|/B_0$.
+- The sphere page draws real field lines in the $x$-$z$ plane.
+  The exterior field is the uniform field plus the London dipole.
+  The interior field is the exact London solution.
+- The finite-body page draws an $x$-$y$ heatmap.
+  The scalar solver has no in-plane vector field.
+  The map shows $B$ out of plane.
+  A note says this.
+  Do not read the map as field lines.
+- The Combined page draws a $2 \times 3$ set of $|B|/B_0$ small multiples.
+  The individual pages show the field lines.
+
+### Common size on the Combined page
+
+The Combined page uses one size for every geometry:
+
+$$s/\lambda = d/(2\lambda) = R/\lambda$$
+
+Here $s$ is the slab half-thickness and the cylinder radius.
+The sphere radius, the film half-thickness, and the finite-body half-side use the same $s$.
+The $x$ axis runs $s/\lambda$ from the nearest face.
+The slab and cylinder curves stop at $s = \text{size}$.
 
 ## Implemented cylinder slice
 
@@ -360,8 +393,8 @@ The smoke check checks these values:
 - Sphere equator at $R = 2.9\lambda$: $1.157976253$.
 - Sphere screening factor at $R = 50\lambda$: $0.9412$.
 
-This slice does not model the normal state or the vortices.
-The 2D field lines of the sphere are a later slice.
+The normal-state toggle shows a card that says the model has no normal-state limit.
+The sphere page draws the real field lines in the $x$-$z$ plane.
 
 ### Implemented finite-body slice
 
@@ -453,7 +486,9 @@ The list below states each family and its limits.
   [`finite_body.py`](../src/magpenetration_simulation/finite_body.py) provides the 2D solve and the valid-zone mask.
   Box and disk geometries are later slices.
 - The app draws the rectangle as a 2D scalar heatmap.
-  The 2D field-line layer stays a separate slice.
+  The scalar solver has no in-plane vector field.
+  The map shows $B$ out of plane.
+  The pages with straight field lines draw them along the field axis.
 
 Every closed form follows from the local London equation.
 The numeric path inherits the same limits.

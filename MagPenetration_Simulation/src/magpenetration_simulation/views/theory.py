@@ -1,21 +1,13 @@
 """Theory page: the London model, its length scales, and its limits."""
 
-import math
-
 import streamlit as st
 
 from magpenetration_simulation import ui
 from magpenetration_simulation import ui_config as cfg
 
 
-def render(material):
+def render():
     """Explain the London equation, the geometry families, and the limits."""
-    lam = material["lambda"]
-    lam_0 = material["lambda_0"]
-    t_c = material["t_c"]
-    ratio = material["t"] / t_c
-    normal = not math.isfinite(lam)
-
     ui.page_title("Theory", "The London model behind every page of this app.")
 
     st.markdown(
@@ -97,16 +89,9 @@ def render(material):
             f"The temperature slider stops at **{cfg.TEMPERATURE['clamp_factor']:.3f} T_c**. "
             "The clamp keeps λ finite. The slab equation then has a solution."
         )
-
-    with ui.card("card_now"):
-        ui.card_title("Current settings")
-        k = st.columns(4, gap="medium")
-        k[0].metric("λ₀", f"{lam_0 * 1e9:,.0f} nm", delta_color="off", delta_arrow="off")
-        k[1].metric("T_c", f"{t_c:.2f} K", delta_color="off", delta_arrow="off")
-        k[2].metric("T / T_c", f"{ratio:.3f}", delta_color="off", delta_arrow="off")
-        k[3].metric("λ(T)", "infinite" if normal else f"{lam * 1e9:,.0f} nm",
-                    delta_color="off", delta_arrow="off",
-                    help="The sidebar sets these values. Every page uses them.")
+        st.markdown(
+            "Each page sets its own T, T_c, λ₀, and B_0."
+        )
 
     # ------------------------------------------------------------- geometry
     with ui.card("card_geom"):

@@ -7,7 +7,7 @@ $$\lambda^2 \frac{d^2B}{dx^2} = B, \qquad B(\pm d/2) = B_0,$$
 
 whose exact slab solution is $B(x) = B_0\cosh(x/\lambda)/\cosh(d/2\lambda)$.
 The app shows the slab, the axial cylinder, the sphere, a rectangle, and a thin film.
-It also compares the two closed forms.
+It also compares five geometries at one common size.
 The code checks three numerical slab methods against that analytic answer.
 The techniques and the reasons for each choice are in
 [`docs/q6_simulation_techniques.md`](docs/q6_simulation_techniques.md).
@@ -45,20 +45,40 @@ The large title at the top is a button.
 Click the title to return to **Theory**.
 Only the active page computes.
 
-### Sidebar
+### Layout
 
-The sidebar provides the material and field controls.
-The active page reads these values.
+Each geometry page uses the same layout.
+The title comes first.
+A left control column holds the compact Material and field card, the size control, the grid points, and the units.
+A right card shows the field map.
+The profile charts come last.
+
+### Material and field
+
+Each page draws its own **Material and field** card.
+The card sets the material and the field for that page only.
+There is no sidebar.
 
 - Critical temperature $T_c$ in K.
 - Temperature $T$ in K. The control stops at $0.995\,T_c$.
 - Penetration depth at zero temperature $\lambda_0$ in nm.
 - Applied field $B_0$ in mT.
 - A **Normal state** toggle, which sends $\lambda$ to infinity.
-- The light and dark theme switch.
 
-Temperature is no longer a tab.
-The sidebar holds $T$, and the geometry pages use $\lambda(T)$.
+Each page uses $\lambda(T)$ from its own card.
+The pages do not share $T$, $T_c$, $\lambda_0$, $B_0$, the normal state, the size, or the grid points.
+The light and dark theme switch is in the header.
+Temperature is not a tab.
+
+### Size
+
+Each geometry page has a **Size by** switch:
+
+- **Physical** sets the size in nm. This is the default.
+  A change in $T$ changes $\lambda$.
+  The profile then changes.
+- **Ratio** sets the size in $\lambda$.
+  The normalized profile is temperature-independent.
 
 ### Pages
 
@@ -67,11 +87,11 @@ The sidebar holds $T$, and the geometry pages use $\lambda(T)$.
 | Theory | The London equation, the penetration depth, the two-fluid law, the geometry families, the assumptions, and the limits. |
 | Methods | Finite difference, SOR, and shooting against the analytic profile, with error cards. |
 | Slab | The analytic slab profile, the temperature family, the $\lambda(T)$ chart, and the Pearl warning. |
-| Cylinder | The axial Bessel profile, the $R/\lambda$ family, and the temperature family. |
-| Sphere | The exact vector solution, the equatorial and surface profiles, and the center, mean, screening, equator, and dipole cards. |
-| Finite body | The 2D scalar field map of a rectangle, the valid-zone mask, and the center, mean, residual, and sweep cards. |
+| Cylinder | The axial Bessel profile, the $R/\lambda$ family, the temperature family, and the longitudinal field map. |
+| Sphere | The exact vector solution and the real field lines in the $x$-$z$ plane. It plots the equatorial and surface profiles. The cards give the center, mean, screening, equator, and dipole values. |
+| Finite body | The $x$-$y$ scalar field map of a rectangle, the valid-zone mask, and the center, mean, residual, and sweep cards. |
 | Film | The Pearl length, the regime, the parallel profile, the temperature family, and the center and mean cards. |
-| Combined | The slab and the cylinder on one depth axis, with six metric cards. |
+| Combined | The comparison table and the $2 \times 3$ small multiples of $\lvert B\rvert/B_0$ for every geometry at one common size. |
 
 **Methods** defines its own controls: $d/\lambda$, $N$, the method selector, and
 the scaled or physical units.
@@ -84,17 +104,16 @@ It warns when $d/\lambda$ drops below 2, where the Pearl length replaces
 $\lambda$.
 
 **Cylinder** gives the same three cards.
-It adds a near-wall reference curve for $R/\lambda \ge 10$.
 
 **Sphere** shows the exact vector London solution.
 It plots the equatorial radial profile and the boundary field against latitude.
 It gives six cards: the center field, the axial mean, the screening factor $S$,
 the equator field, and the dipole moment.
-This page does not model the normal state.
-A 2D field-line view is a later slice.
+The **Normal state** toggle shows the normal-state card, which says the model has no normal-state limit.
 
 **Finite body** solves the 2D scalar equation on a rectangle.
-It holds $B = B_0$ on all four edges and draws the field as a heatmap.
+It holds $B = B_0$ on all four edges and draws $B$ out of plane as an $x$-$y$ heatmap.
+The scalar solver has no in-plane vector field, so the map does not claim field lines.
 A dashed mask marks the valid zone, at least $3\lambda$ from every edge.
 The cards give the center field, the mean field, the residual, and the sweeps.
 The outside field, demagnetization, and edge-current turning stay outside this model.
@@ -108,11 +127,30 @@ The cards give the center field and the mean field.
 This page does not solve the perpendicular field, its edge currents, or
 demagnetization.
 
-**Combined** plots both geometries against the depth from the nearest face,
+**Combined** plots five geometries against the depth from the nearest face,
 $s/\lambda$.
-A later slice will add the 2D field-line view to that page.
+It also shows a $2 \times 3$ set of $|B|/B_0$ small multiples.
+The individual pages show the field lines.
 
 The theme switch applies to each page.
+
+### Visualization
+
+The field maps come from `src/magpenetration_simulation/visualization.py`.
+Each page draws its own map.
+
+- Slab, cylinder, and film: a longitudinal section.
+  The field lines are straight and follow the field axis.
+  The heatmap shows $|B|/B_0$.
+- Sphere: real field lines in the $x$-$z$ plane.
+  The exterior field is the uniform field plus the London dipole.
+  The interior field is the exact London solution.
+- Finite body: an $x$-$y$ heatmap.
+  The scalar solver has no in-plane vector field.
+  The map shows $B$ out of plane.
+  A note says this.
+- Combined: a $2 \times 3$ set of $|B|/B_0$ small multiples.
+  The individual pages show the field lines.
 
 ## Smoke check and figures
 
@@ -247,6 +285,10 @@ The film functions live in `src/magpenetration_simulation/film.py`.
 | `film_parallel_center_field(d, lam, b0)` | the center value $B_0/\cosh(d/2\lambda)$ |
 | `film_parallel_mean_field(d, lam, b0)` | the mean $B_0 (2\lambda/d)\tanh(d/2\lambda)$ |
 
+The field maps live in `src/magpenetration_simulation/visualization.py`.
+The module turns a profile into the map of each page.
+[Visualization](#visualization) gives the per-page map.
+
 ## Defaults
 
 | Quantity | Value |
@@ -255,17 +297,21 @@ The film functions live in `src/magpenetration_simulation/film.py`.
 | Critical temperature $T_c$ | 9.2 K |
 | Temperature $T$ | 4.2 K |
 | Applied field $B_0$ | 50 mT |
-| Slab thickness $d$ | $5\lambda$ |
-| Cylinder radius $R$ | $5\lambda$ |
-| Sphere radius $R$ | $5\lambda$ |
-| Finite-body size | $5\lambda \times 5\lambda$ |
+| Slab thickness $d$ | 250 nm (about $5\lambda$) |
+| Cylinder radius $R$ | 250 nm (about $5\lambda$) |
+| Sphere radius $R$ | 250 nm (about $5\lambda$) |
+| Finite-body size | 250 nm $\times$ 250 nm (about $5\lambda$ each side) |
 | Finite-body grid $N$ | 81 |
-| Film thickness $d$ | $1\lambda$ |
+| Film thickness $d$ | 50 nm (about $1\lambda$) |
+| Combined common size $s$ | 250 nm half-size (about $5\lambda$) |
 | Grid points $N$ | 401 |
 | Temperature clamp | $0.995\,T_c$ |
 | Acceptance | max relative error below $10^{-3}$ for every numerical method |
 
+Each geometry page opens in **Physical** mode.
+The sizes above are then in nm.
+At the defaults $\lambda(T) \approx 51$ nm, so 250 nm is about $5\lambda$ and 50 nm is about $1\lambda$.
 The geometry functions take $\lambda$ directly.
-The sidebar temperature controls and the geometry pages supply $\lambda(T)$.
+The material card on each page supplies $\lambda(T)$.
 The theory is in
 [`docs/q6_temperature_theory.md`](docs/q6_temperature_theory.md).

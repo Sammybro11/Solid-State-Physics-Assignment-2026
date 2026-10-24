@@ -4,7 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-from magpenetration_simulation import ui
+from magpenetration_simulation import ui, visualization
 from magpenetration_simulation import ui_config as cfg
 from magpenetration_simulation.sphere import (
     sphere_center_field,
@@ -17,8 +17,8 @@ from magpenetration_simulation.sphere import (
 from magpenetration_simulation.temperature import lambda_of_temperature
 
 NOTE = ("Exact vector London solution for a sphere: local theory, demagnetization "
-        "included through the vector boundary match. The normal state and vortices "
-        "are not modeled. A 2D field-line view is a later slice.")
+        "included through the vector boundary match. Vortices "
+        "are not modeled.")
 
 
 def ratio_text(value):
@@ -29,18 +29,6 @@ def ratio_text(value):
 def y_top(ratio):
     """Y top that never clips the peak: the headroom, or 5% above the data."""
     return max(cfg.PLOT["y_headroom"], 1.05 * float(np.max(ratio)))
-
-def radial_chart(r_over_r, ratio, view, b_0, t):
-    """|B_theta| against r/R along the equator, where B_theta is the whole field."""
-    yf = b_0 * 1e3 if view == ui.GEOM_VIEWS[1] else 1.0
-    fig = go.Figure()
-    fig.add_scatter(x=r_over_r, y=ratio * yf, mode="lines", name="B",
-                    line={"color": t["analytic"], "width": 2.4}, hovertemplate="%{y:.4f}")
-    fig.update_xaxes(title="r / R")
-    fig.update_yaxes(title="B (mT)" if view == ui.GEOM_VIEWS[1] else "B / B₀",
-                     range=[0, y_top(ratio) * yf])
-    return ui.style(fig, t, ui.CHART_H, uirevision=f"sphere-radial-{view}")
-
 
 def surface_chart(theta, ratio, view, b_0, t):
     """|B(R, theta)| against polar angle, with the equator and both poles marked."""
@@ -96,77 +84,73 @@ def normal_view(t):
                 "modeled in this slice.")
 
 
-def render(material):
-    """Show the equator profile, the surface field, and the temperature family."""
+def render():
+    """Show the field map and metrics, the equator family, and the surface field."""
     t = ui.theme()
-    b_0 = material["b_0"]
     ui.page_title("Sphere", "A sphere of radius R in a uniform field B₀: the equator, the surface, and the demagnetization.")
+    left, right = st.columns([0.34, 0.66], gap="medium")
 
-    with ui.card("controls"):
-        c = st.columns([1.3, 1.1, 1], gap="large", vertical_alignment="bottom")
-        with c[0]:
-            size_cfg = cfg.SPHERE["size"]
-            size = float(ui.live_slider("Radius R/λ", size_cfg["min"], size_cfg["max"],
-                                        size_cfg["default"], size_cfg["step"], "s_size", t,
-                                        decimals=1))
-        with c[1]:
+    with left:
+        material = ui.material_controls("sphere", compact=True)
+        lam = material["lambda"]
+        lambda_0, t_c = material["lambda_0"], material["t_c"]
+        t_k, b_0 = material["t"], material["b_0"]
+        with ui.card("controls"):
+            size = ui.size_input("sphere", cfg.SPHERE["size"], cfg.SPHERE["r_nm"],
+                                 "Radius R/λ", "Radius R (nm)", lam, t)
             n_points = int(ui.live_slider("Grid points N (odd)", cfg.GRID["min"], cfg.GRID["max"],
-                                          cfg.GRID["default"], cfg.GRID["step"], "s_points", t))
-        with c[2]:
+                                          cfg.GRID["default"], cfg.GRID["step"], "sphere_points", t))
             view = st.segmented_control("Units", ui.GEOM_VIEWS, default=ui.GEOM_VIEWS[0],
-                                        label_visibility="collapsed", key="s_units") or ui.GEOM_VIEWS[0]
+                                        key="sphere_units") or ui.GEOM_VIEWS[0]
 
     if material["normal_state"]:
-        normal_view(t)
+        with right:
+            normal_view(t)
         st.caption(NOTE)
         return
 
-    lam = material["lambda"]
-    radius = size * lam
-    lambda_0, t_c = material["lambda_0"], material["t_c"]
+    radius, ratio = size["size_m"], size["ratio"]
     centre_ratio = sphere_center_field(radius, lam, b_0) / b_0
     mean_ratio = sphere_mean_field(radius, lam, b_0) / b_0
     screening = sphere_screening_factor(radius, lam, b_0)
     equator_ratio = sphere_equator_field(radius, lam, b_0) / b_0
     moment = sphere_dipole_moment(radius, lam, b_0)
 
-    k = st.columns(6)
-    k[0].metric("London depth λ(T)", f"{lam * 1e9:.1f} nm", f"λ₀ = {lambda_0 * 1e9:.0f} nm",
-                delta_color="off", delta_arrow="off")
-    k[1].metric("Centre field B(0)/B₀", ratio_text(centre_ratio),
-                help="B₀ (R/λ) / sinh(R/λ).")
-    k[2].metric("Axial mean ⟨B_z⟩/B₀", ratio_text(mean_ratio), help="B₀ (1 − S).")
-    k[3].metric("Screening factor S", f"{screening:.4f}",
-                help="1 − 3(λ/R) coth(R/λ) + 3λ²/R². Sets the exterior dipole.")
-    k[4].metric("Equator field B_eq/B₀", ratio_text(equator_ratio),
-                help="(3/2) B₀ (1 − i₁(R/λ)/sinh(R/λ)). Tends to 1.5 B₀.")
-    k[5].metric("Dipole moment |m|", f"{ui.sci(abs(moment))} A m²",
-                help="m = −(2πR³B₀/µ₀) S, negative for B₀ > 0 (diamagnetic).")
+    with right:
+        with ui.card("card_sphere_map"):
+            ui.card_title("Field map")
+            ui.live_chart(visualization.sphere_section(radius, lam, b_0, t), key="sphere_visual")
+            st.caption("x-z section: real in-plane field lines. Outside is the uniform field "
+                       "plus the London dipole; inside is the exact London field.")
+        k = st.columns(3, gap="small")
+        k[0].metric("London depth λ(T)", f"{lam * 1e9:.1f} nm", f"λ₀ = {lambda_0 * 1e9:.0f} nm",
+                    delta_color="off", delta_arrow="off")
+        k[1].metric("Centre field B(0)/B₀", ratio_text(centre_ratio),
+                    help="B₀ (R/λ) / sinh(R/λ).")
+        k[2].metric("Axial mean ⟨B_z⟩/B₀", ratio_text(mean_ratio), help="B₀ (1 − S).")
+        k = st.columns(3, gap="small")
+        k[0].metric("Screening factor S", f"{screening:.4f}",
+                    help="1 − 3(λ/R) coth(R/λ) + 3λ²/R². Sets the exterior dipole.")
+        k[1].metric("Equator field B_eq/B₀", ratio_text(equator_ratio),
+                    help="(3/2) B₀ (1 − i₁(R/λ)/sinh(R/λ)). Tends to 1.5 B₀.")
+        k[2].metric("Dipole moment |m|", f"{ui.sci(abs(moment))} A m²",
+                    help="m = −(2πR³B₀/µ₀) S, negative for B₀ > 0 (diamagnetic).")
 
-    r = np.linspace(0.0, radius, n_points)
-    _, b_theta = sphere_field(r, np.pi / 2.0, radius, lam, b_0)
     theta = np.linspace(0.0, np.pi, n_points)
     b_r_s, b_theta_s = sphere_field(radius, theta, radius, lam, b_0)
     surface = np.sqrt(b_r_s**2 + b_theta_s**2) / b_0
 
-    left, right = st.columns(2, gap="medium")
-    with left, ui.card("card_sphere_radial"):
+    c1, c2 = st.columns(2, gap="medium")
+    with c1, ui.card("card_sphere_radial"):
         ui.card_title("Equatorial radial profile")
-        ui.live_chart(radial_chart(r / radius, np.abs(b_theta) / b_0, view, b_0, t),
+        ui.live_chart(temperature_chart(radius, lambda_0, t_c, b_0, t_k, view, t),
                       key="sphere_radial")
-        st.caption("|B_θ| at θ = π/2, where B_r = 0. B_θ itself is negative there, so the "
-                   "field points along B₀.")
-    with right, ui.card("card_sphere_surface"):
+        st.caption("|B_θ| at θ = π/2, where B_r = 0. Faint: T/T_c family at fixed R. "
+                   "Bold: the current T. A rise in T raises λ and weakens screening.")
+    with c2, ui.card("card_sphere_surface"):
         ui.card_title("Surface field against latitude")
         ui.live_chart(surface_chart(theta, surface, view, b_0, t), key="sphere_surface")
         st.caption("Demagnetization: the surface field peaks at the equator and falls "
                    "towards the poles, so the applied field is not the boundary value.")
 
-    with ui.card("card_sphere_temp"):
-        ui.card_title("Temperature family")
-        ui.live_chart(temperature_chart(radius, lambda_0, t_c, b_0, lam, view, t),
-                      key="sphere_temp")
-        st.caption("Fixed R. Faint: T/T_c family. Bold: current T. A rise in T "
-                   "raises λ and weakens screening.")
-
-    st.caption(NOTE)
+    st.caption(f"R/λ = {ratio:.1f}. " + NOTE)

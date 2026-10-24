@@ -362,23 +362,24 @@ the same $N$. The physical limits of the London model itself are those of
 | `slab.py` | #6.2 | analytic solution (#3.1), finite differences (#3.2), relaxation (#3.3), and shooting (#3.4); implemented in PR #11 |
 | `cylinder.py` | #6.3 | the same methods with modified Bessel functions ($I_0$, derivative $I_1$) |
 | `temperature.py` | #6.4 | the two-fluid law for $\lambda(T)$ [4] with slider-driven plots |
-| `visualization.py` | #6.5 | `imshow` and `contourf` heat maps of the field magnitude |
+| `visualization.py` | #6.5 | field maps and field lines for the page panels |
 | `app.py` | #6.6 | interactive inputs for $T$, $B_0$, $\lambda$, and geometry; the slab page is implemented in PR #11 |
 
 `slab.py` exposes one function per technique: `slab_field_analytic`,
 `slab_field_finite_difference`, `slab_field_relaxation`, and
 `slab_field_shooting`. `scripts/make_figures.py` compares each numerical
 method with the analytic answer; this PR has no pytest suite.
-`cylinder.py` will repeat the same pattern. The analytic answer for a
+`cylinder.py` repeats the same pattern. The analytic answer for a
 cylinder of radius $a$ with an axial field is
 $B(r) = B_0\,I_0(r/\lambda)/I_0(a/\lambda)$. The solvers reuse the same
 discretization. The cylindrical Laplacian adds a $B'/r$ term to the radial
-form. `temperature.py` will wrap the law of #2.2 in a function. It will
-pass $\lambda(T)$ over $T/T_c$ in $[0, 0.99]$ to the geometry functions.
-`visualization.py` will show heat maps of the field magnitude on 2D grids.
-The slab page of `app.py` already connects sliders for $d/\lambda$, $B_0$,
-$\lambda_0$, and $N$ to the field and error plots, and the display updates
-while a slider moves.
+form. `temperature.py` wraps the law of #2.2 in a function. It
+passes $\lambda(T)$ over $T/T_c$ in $[0, 0.99]$ to the geometry functions.
+`visualization.py` draws the field map of each page.
+Each page draws its own Material and field card, and that card sets $T$, $T_c$,
+$\lambda_0$, and $B_0$.
+The page also sets the size and $N$.
+The display updates while a slider moves.
 
 ## 6. What was done and why
 

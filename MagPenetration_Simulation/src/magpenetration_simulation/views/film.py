@@ -1,16 +1,17 @@
 """Film page: a thin film, the Pearl regime, and the exact parallel profile."""
 
+import math
+
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-from magpenetration_simulation import ui
+from magpenetration_simulation import ui, visualization
 from magpenetration_simulation import ui_config as cfg
 from magpenetration_simulation.film import (
     film_crossover,
     film_parallel_center_field,
     film_parallel_mean_field,
-    film_parallel_profile,
     film_regime,
     inplane_screening_length,
     pearl_length,
@@ -51,101 +52,112 @@ def profile_chart(x_nm, ratio, b_0, units, t):
     return ui.style(fig, t, ui.CHART_H, uirevision=f"film-profile-{units}-{x_nm[0]:.6e}-{x_nm[-1]:.6e}")
 
 
-def normal_view(t, b_0, lambda_0, d_over_lam, n_points, units):
+def map_caption():
+    """The section caption: what the picture shows and what it leaves out."""
+    st.caption("Longitudinal section: the parallel field runs along z, and the colour is |B|/B₀. "
+               "There is no substrate because the film model has none.")
+
+
+def normal_view(col, t, b_0, d, n_points, units):
     """Flat field at B0 and the why, when screening has vanished."""
-    k = st.columns(4)
+    with col, ui.card("card_map"):
+        ui.card_title("Field map")
+        ui.live_chart(visualization.film_section(d, math.inf, b_0, t), key="film_visual")
+        map_caption()
+
+    k = col.columns(4)
     k[0].metric("λ(T)", "∞", "normal state", delta_color="off", delta_arrow="off")
     k[1].metric("Pearl length Λ", "∞", "2λ²/d", delta_color="off", delta_arrow="off")
     k[2].metric("Centre field B(0)/B₀", "1.000", "no screening", delta_color="off", delta_arrow="off")
     k[3].metric("Mean field ⟨B⟩/B₀", "1.000", "volume average", delta_color="off", delta_arrow="off")
 
-    # λ is infinite, so the window is sized in units of λ0 instead of λ.
-    span_nm = d_over_lam * lambda_0 * 1e9
-    x_nm = np.linspace(-span_nm / 2.0, span_nm / 2.0, n_points)
-    with ui.card("card_profile"):
-        ui.card_title("Parallel field profile")
+    d_nm = d * 1e9
+    x_nm = np.linspace(-d_nm / 2.0, d_nm / 2.0, n_points)
+    profile_col, info_col = st.columns(2, gap="medium")
+    with profile_col, ui.card("card_profile"):
+        ui.card_title("Parallel profile")
         ui.live_chart(profile_chart(x_nm, np.ones_like(x_nm), b_0, units, t), key="film_profile")
-    st.caption("Normal state: λ → ∞ and Λ → ∞, so the field is flat at B₀ and the film screens nothing. "
-               "The d/λ slider sets the window in units of λ₀.")
-    ui.normal_state_infographic(t)
+        st.caption("Normal state: λ → ∞ and Λ → ∞, so the field is flat at B₀ and the film screens nothing.")
+    with info_col:
+        ui.normal_state_infographic(t)
 
 
-def render(material):
+def render():
     """Show the Pearl length, the exact parallel profile, and the regime."""
     t = ui.theme()
-    lam, lambda_0 = material["lambda"], material["lambda_0"]
-    t_c, t_k, b_0 = material["t_c"], material["t"], material["b_0"]
-
     ui.page_title("Film", "Thin film of thickness d: the Pearl length, the regime, and the exact parallel profile.")
 
-    with ui.card("controls"):
-        c = st.columns([1, 1, 0.7], gap="large", vertical_alignment="bottom")
-        with c[0]:
-            f_cfg = cfg.FILM["thickness"]
-            d_over_lam = ui.live_slider("Film thickness d/λ", f_cfg["min"], f_cfg["max"],
-                                        f_cfg["default"], f_cfg["step"], "d_over_lam", t,
-                                        decimals=1)
-        with c[1]:
+    left, right = st.columns([0.34, 0.66], gap="medium")
+    with left:
+        material = ui.material_controls("film", compact=True)
+        with ui.card("controls"):
+            size = ui.size_input("film", cfg.FILM["thickness"], cfg.FILM["d_nm"],
+                                 "Film thickness d/λ", "Film thickness d (nm)", material["lambda"], t)
             n_points = int(ui.live_slider("Grid points N (odd)", cfg.GRID["min"], cfg.GRID["max"],
-                                          cfg.GRID["default"], cfg.GRID["step"], "n_points", t))
-        units = c[2].segmented_control("Units", ui.GEOM_VIEWS, default=ui.GEOM_VIEWS[0],
-                                       key="film_units") or ui.GEOM_VIEWS[0]
+                                          cfg.GRID["default"], cfg.GRID["step"], "film_points", t))
+            units = st.segmented_control("Units", ui.GEOM_VIEWS, default=ui.GEOM_VIEWS[0],
+                                         key="film_units") or ui.GEOM_VIEWS[0]
+
+    lam, lambda_0 = material["lambda"], material["lambda_0"]
+    t_c, t_k, b_0 = material["t_c"], material["t"], material["b_0"]
+    # λ is infinite in the normal state, so a ratio-sized film is taken in units of λ0.
+    d = size["size_m"] if math.isfinite(size["size_m"]) else size["ratio"] * lambda_0
+    thickness_ratio = size["ratio"]
 
     if material["normal_state"]:
-        normal_view(t, b_0, lambda_0, d_over_lam, n_points, units)
+        normal_view(right, t, b_0, d, n_points, units)
+        st.caption("The perpendicular-field film, its edge currents, and demagnetization "
+                   "are not solved here.")
         return
 
-    d = d_over_lam * lam
     pearl = pearl_length(lam, d)
     crossing = film_crossover(lam)
     regime = film_regime(lam, d)
     centre = film_parallel_center_field(d, lam, b_0) / b_0
     mean = film_parallel_mean_field(d, lam, b_0) / b_0
 
-    m = st.columns(4)
-    m[0].metric("λ(T)", f"{lam * 1e9:.1f} nm", f"λ₀ = {lambda_0 * 1e9:.0f} nm",
-                delta_color="off", delta_arrow="off")
-    m[1].metric("Pearl length Λ", f"{pearl * 1e9:.3g} nm", "2λ²/d",
-                delta_color="off", delta_arrow="off",
-                help="Λ sets in-plane screening in a perpendicular field.")
-    m[2].metric("Λ / λ", ratio_text(pearl_ratio(lam, d)), "2λ/d",
-                delta_color="off", delta_arrow="off",
-                help="Above 1 for d < 2λ: the film screens in plane less than λ suggests.")
-    m[3].metric("In-plane screening length", f"{inplane_screening_length(lam, d) * 1e9:.3g} nm",
-                "max(Λ, λ)", delta_color="off", delta_arrow="off")
-    m = st.columns(4)
-    m[0].metric("Regime", regime.capitalize(), f"d/λ = {d_over_lam:.1f}",
-                delta_color="off", delta_arrow="off")
-    m[1].metric("Centre field B(0)/B₀", ratio_text(centre), ui.field_text(centre * b_0),
-                delta_color="off", delta_arrow="off",
-                help="Parallel field at the film midplane.")
-    m[2].metric("Mean field ⟨B⟩/B₀", ratio_text(mean), "volume average",
-                delta_color="off", delta_arrow="off",
-                help="⟨B⟩/B₀ = (2λ/d) tanh(d/2λ).")
-    m[3].metric("Crossover thickness 2λ", f"{crossing * 1e9:.1f} nm", "Λ = λ",
-                delta_color="off", delta_arrow="off")
+    with right:
+        with ui.card("card_map"):
+            ui.card_title("Field map")
+            ui.live_chart(visualization.film_section(d, lam, b_0, t), key="film_visual")
+            map_caption()
+        m = st.columns(4)
+        m[0].metric("λ(T)", f"{lam * 1e9:.1f} nm", f"λ₀ = {lambda_0 * 1e9:.0f} nm",
+                    delta_color="off", delta_arrow="off")
+        m[1].metric("Pearl length Λ", f"{pearl * 1e9:.3g} nm", "2λ²/d",
+                    delta_color="off", delta_arrow="off",
+                    help="Λ sets in-plane screening in a perpendicular field.")
+        m[2].metric("Λ / λ", ratio_text(pearl_ratio(lam, d)), "2λ/d",
+                    delta_color="off", delta_arrow="off",
+                    help="Above 1 for d < 2λ: the film screens in plane less than λ suggests.")
+        m[3].metric("In-plane screening length", f"{inplane_screening_length(lam, d) * 1e9:.3g} nm",
+                    "max(Λ, λ)", delta_color="off", delta_arrow="off")
+        m = st.columns(4)
+        m[0].metric("Regime", regime.capitalize(), f"d/λ = {thickness_ratio:.1f}",
+                    delta_color="off", delta_arrow="off")
+        m[1].metric("Centre field B(0)/B₀", ratio_text(centre), ui.field_text(centre * b_0),
+                    delta_color="off", delta_arrow="off",
+                    help="Parallel field at the film midplane.")
+        m[2].metric("Mean field ⟨B⟩/B₀", ratio_text(mean), "volume average",
+                    delta_color="off", delta_arrow="off",
+                    help="⟨B⟩/B₀ = (2λ/d) tanh(d/2λ).")
+        m[3].metric("Crossover thickness 2λ", f"{crossing * 1e9:.1f} nm", "Λ = λ",
+                    delta_color="off", delta_arrow="off")
+        if regime == "pearl":
+            st.warning(f"Pearl regime: d/λ = {thickness_ratio:g} < 2. Λ = 2λ²/d = {pearl * 1e9:.3g} nm "
+                       "replaces λ for in-plane fields in a perpendicular field.")
 
-    if regime == "pearl":
-        st.warning(f"Pearl regime: d/λ = {d_over_lam:g} < 2. Λ = 2λ²/d = {pearl * 1e9:.3g} nm "
-                   "replaces λ for in-plane fields in a perpendicular field.")
-
-    pearl_col, profile_col = st.columns([1, 1.35], gap="medium")
+    profile_col, pearl_col = st.columns(2, gap="medium")
+    with profile_col, ui.card("card_profile"):
+        ui.card_title("Parallel profile")
+        ui.live_chart(ui.temperature_profile_chart(t_c, lambda_0, d, b_0, t_k, units, t),
+                      key="film_profile")
+        st.caption("All temperatures meet at B₀ at both faces; the current T is bold. "
+                   "The parallel-field profile is exact at every thickness.")
     with pearl_col, ui.card("card_pearl"):
         ui.card_title("Pearl length")
-        ui.live_chart(pearl_chart(d_over_lam, n_points, t), key="film_pearl")
+        ui.live_chart(pearl_chart(thickness_ratio, n_points, t), key="film_pearl")
         st.caption("Λ/λ = 2/(d/λ). The dot is the current thickness and the dashed line is the crossover at d = 2λ.")
-    with profile_col, ui.card("card_profile"):
-        ui.card_title("Parallel field profile")
-        x = np.linspace(-d / 2.0, d / 2.0, n_points)
-        ui.live_chart(profile_chart(x * 1e9, film_parallel_profile(x, d, lam, b_0) / b_0,
-                                    b_0, units, t), key="film_profile")
-        st.caption("This parallel-field profile is exact at every thickness.")
 
-    with ui.card("card_family"):
-        ui.card_title("Temperature family")
-        ui.live_chart(ui.temperature_profile_chart(t_c, lambda_0, d, b_0, t_k, units, t),
-                      key="film_family")
-        st.caption("All temperatures meet at B₀ at both faces. The current T is bold.")
-
-    st.caption("The perpendicular-field film, its edge currents, and demagnetization are not solved here. "
-               "The 2D field-line view is a later slice.")
+    st.caption("The perpendicular-field film, its edge currents, and demagnetization "
+               "are not solved here.")

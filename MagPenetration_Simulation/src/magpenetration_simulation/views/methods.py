@@ -139,11 +139,12 @@ def error_chart(r, shown, scale, units, t):
     return ui.style(fig, t, ui.CHART_H, uirevision=f"error-{units}-{scale}-{r['dt']:.3f}")
 
 
-def render(material):
-    """Compare the slab solvers at the shared lambda(T) and B_0."""
+def render():
+    """Compare the slab solvers at the page's own lambda(T) and B_0."""
     t = ui.theme()
-    lam, b_0 = material["lambda"], material["b_0"]
     ui.page_title("Methods", "Three slab solvers on one shared grid.")
+    material = ui.material_controls("methods")
+    lam, b_0 = material["lambda"], material["b_0"]
     st.markdown(
         "**Finite difference** solves the tridiagonal London system in one pass. "
         "**Red-black SOR** relaxes the same grid in two interleaved colours. "
@@ -161,7 +162,7 @@ def render(material):
                                         d_cfg["default"], d_cfg["step"], "d_over_lam", t, decimals=1)
         with c[1]:
             n_points = int(ui.live_slider("Grid points N (odd)", cfg.GRID["min"], cfg.GRID["max"],
-                                          cfg.GRID["default"], cfg.GRID["step"], "n_points", t))
+                                          cfg.GRID["default"], cfg.GRID["step"], "methods_points", t))
 
     if not math.isfinite(lam):
         st.warning("Normal state: λ is infinite, so there is no screening profile to solve.")

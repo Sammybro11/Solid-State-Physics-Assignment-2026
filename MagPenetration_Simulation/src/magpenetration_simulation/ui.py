@@ -6,6 +6,7 @@ and temperature.py.
 """
 
 import json
+import math
 
 import numpy as np
 import plotly.graph_objects as go
@@ -135,16 +136,16 @@ def temperature_profile_chart(t_c, lambda_0_m, d_m, b_0, t_k, units, t):
 
 
 def geometry_curves(size, lam, b0, n_points):
-    """Slab and cylinder fields at the same size, d = R = size * lam.
+    """Slab and cylinder fields at the common size s / λ = d / (2 λ) = R / λ = size.
 
     Returns s/lam for each curve, both measured from the nearest face, with the
-    fields as B/B0. The slab curve stops at its centre, s = size/2; the
-    cylinder curve reaches its axis, s = size.
+    fields as B/B0. Both curves stop at s = size: the slab centre (s is the
+    half-thickness) and the cylinder axis.
     """
-    d = size * lam
-    s = np.linspace(0.0, size / 2.0, n_points)
+    d = 2.0 * size * lam
+    s = np.linspace(0.0, size, n_points)
     slab = slab_field_analytic(d / 2.0 - s * lam, d, lam, b0) / b0
-    r, cyl = cylinder_field_profile(d, lam, b0, n_points)
+    r, cyl = cylinder_field_profile(size * lam, lam, b0, n_points)
     return s, slab, size - r[::-1] / lam, cyl[::-1] / b0
 
 
@@ -343,6 +344,76 @@ def card_title(text, where=None):
     (where or st).markdown(f'<p class="card-title">{text}</p>', unsafe_allow_html=True)
 
 
+def material_controls(prefix, compact=False):
+    """The material and field card for one page. Returns values in SI units (m, T, K).
+
+    compact=True stacks the widgets as a narrow card for a page's left column.
+    """
+    t_c_cfg, t_cfg = cfg.MATERIAL["t_c"], cfg.MATERIAL["t"]
+    lam_cfg, b_cfg = cfg.MATERIAL["lambda_0"], cfg.MATERIAL["b_0"]
+    st.session_state.setdefault(f"{prefix}_tc", t_c_cfg["default"])
+    clamp = float(clamp_temperature(st.session_state[f"{prefix}_tc"], cfg.TEMPERATURE["clamp_factor"]))
+    # A lower T_c leaves the stored T above the new clamp, so pull it down first.
+    st.session_state.setdefault(f"{prefix}_t", min(t_cfg["default"], clamp))
+    st.session_state[f"{prefix}_t"] = min(st.session_state[f"{prefix}_t"], clamp)
+    st.session_state.setdefault(f"{prefix}_lam0", lam_cfg["default"])
+    st.session_state.setdefault(f"{prefix}_b0", b_cfg["default"])
+    st.session_state.setdefault(f"{prefix}_normal", False)
+    with card(f"card_material_{prefix}"):
+        card_title("Material and field")
+        if compact:
+            # Two widgets per row, normal-state toggle on its own row: a narrow left-column card.
+            slots = (*st.columns(2, gap="small", vertical_alignment="bottom"),
+                     *st.columns(2, gap="small", vertical_alignment="bottom"), st)
+        else:
+            slots = st.columns(5, gap="medium", vertical_alignment="bottom")
+        slots[0].number_input("Critical temperature T_c (K)", min_value=t_c_cfg["min"],
+                              max_value=t_c_cfg["max"], step=t_c_cfg["step"], key=f"{prefix}_tc")
+        slots[1].slider("Temperature T (K)", t_cfg["min"], clamp, step=t_cfg["step"], key=f"{prefix}_t")
+        slots[2].slider("Penetration depth λ₀ (nm)", lam_cfg["min"], lam_cfg["max"], step=lam_cfg["step"],
+                        key=f"{prefix}_lam0")
+        slots[3].slider("Applied field B₀ (mT)", b_cfg["min"], b_cfg["max"], step=b_cfg["step"],
+                        key=f"{prefix}_b0")
+        slots[4].toggle("Normal state (T > T_c)", key=f"{prefix}_normal",
+                        help="Screening vanishes: λ → ∞ and the field is flat at B₀.")
+    normal = bool(st.session_state[f"{prefix}_normal"])
+    t_k = float(st.session_state[f"{prefix}_t"])
+    t_c = float(st.session_state[f"{prefix}_tc"])
+    lambda_0 = st.session_state[f"{prefix}_lam0"] * 1e-9
+    return {
+        "t": t_k,
+        "t_c": t_c,
+        "lambda_0": lambda_0,
+        "b_0": st.session_state[f"{prefix}_b0"] * 1e-3,
+        "lambda": math.inf if normal else lambda_of_temperature(t_k, lambda_0, t_c),
+        "normal_state": normal,
+    }
+
+
+def size_input(prefix, ratio_cfg, physical_cfg, ratio_label, physical_label, lam, t):
+    """One body size, set as a ratio to lambda or as physical nanometres. Default Physical."""
+    mode = st.segmented_control("Size by", ["Ratio", "Physical"], default="Physical",
+                               key=f"{prefix}_size_mode", label_visibility="collapsed") or "Physical"
+    if mode == "Physical":
+        size_nm = live_slider(physical_label, physical_cfg["min"], physical_cfg["max"],
+                              physical_cfg["default"], physical_cfg["step"],
+                              f"{prefix}_size_nm", t, decimals=0, unit=" nm")
+        size_m = size_nm * 1e-9
+        ratio = size_m / lam
+    else:
+        ratio = live_slider(ratio_label, ratio_cfg["min"], ratio_cfg["max"],
+                            ratio_cfg["default"], ratio_cfg["step"],
+                            f"{prefix}_size_ratio", t, decimals=1)
+        size_m = ratio * lam
+        size_nm = size_m * 1e9
+    if math.isfinite(lam):
+        st.caption(f"{ratio:.1f} λ · {size_nm:,.0f} nm")
+    else:  # normal state: λ is infinite, so only the chosen side of the ratio means anything
+        st.caption(f"{size_nm:,.0f} nm · normal state, λ → ∞" if mode == "Physical"
+                   else f"{ratio:.1f} λ · normal state, λ → ∞")
+    return {"mode": mode, "ratio": ratio, "size_m": size_m, "size_nm": size_nm}
+
+
 # ---------------------------------------------------------------- page style
 
 def inject_css(t):
@@ -358,7 +429,6 @@ def inject_css(t):
     .st-key-theme_pick {{position: fixed; top: 0.7rem; right: 1rem; z-index: 999990; width: auto;}}
     .stApp {{background: {t['bg']};}}
     .block-container {{padding: 0.9rem 1.8rem 0.4rem 1.8rem; max-width: 1600px;}}
-    [data-testid="stSidebar"] {{background: {t['card']}; border-right: 1px solid {t['border']};}}
     .stApp [data-testid="stWidgetLabel"] p {{color: {t['text']}; font-size: 0.85rem;}}
     .st-key-brand_home button {{background: transparent; border: none; box-shadow: none;
         padding: 0 0 0.1rem 0; width: 100%; justify-content: flex-start; text-align: left;}}

@@ -235,15 +235,24 @@ The design pairs the depth view with the profile view:
 2. A second panel plots $\lambda$ against $T$, with a marker at the current value.
 3. A family of profiles at the temperatures of Table 2 shows the trend in one frame.
 
+The Slab, Cylinder, Sphere, and Film pages merge that temperature family into the main profile.
+The family is faint, and the current $T$ is bold.
+The Finite body and Combined pages show the current $T$ only.
+
 Table 3 lists the ranges and defaults for the app of item 6.6:
 
 | Control | Range | Default | Step |
 |---|---|---|---|
 | $T$ | 0 to $0.995\,T_c$ | 4.2 K | 0.05 K |
-| $\lambda_0$ | 20 nm to 200 nm | 50 nm | 1 nm |
-| $T_c$ | 1 K to 125 K | 9.2 K | 0.1 K |
-| $d$ | 20 nm to 2000 nm | 200 nm | 10 nm |
-| $B_0$ | 0 mT to 200 mT | 50 mT | 5 mT |
+| $\lambda_0$ | 10 nm to 200 nm | 50 nm | 5 nm |
+| $T_c$ | 1 K to 20 K | 9.2 K | 0.1 K |
+| $d$ or $R$ | 5 nm to 2000 nm | 250 nm | 5 nm |
+| $B_0$ | 10 mT to 500 mT | 50 mT | 10 mT |
+
+Each page draws its own Material and field card with these controls.
+There is no sidebar, and the pages do not share $T$, $T_c$, $\lambda_0$, or $B_0$.
+A page opens in **Physical** mode.
+The **Size by** switch also sets the size in $\lambda$.
 
 The defaults target niobium with $T_c = 9.2$ K.
 When the profile panel plots $B(x)/B_0$, the value of $B_0$ cancels.
@@ -297,7 +306,7 @@ Table 2 comes from a plain-Python computation, and we cross-checked one row agai
 - We designed the four guards, because a user can park the $T$ slider on $T_c$ exactly.
 - [`temperature.py`](../src/magpenetration_simulation/temperature.py) now contains the model.
 Its `lambda_of_temperature(t, lambda_0, t_c)` function is the two-fluid law of section 2.
-- The app sidebar in [`app.py`](../src/magpenetration_simulation/app.py) sets $T$, $T_c$, $\lambda_0$, and $B_0$.
+- Each page sets $T$, $T_c$, $\lambda_0$, and $B_0$ in its material card.
 The geometry pages take $\lambda(T)$ from that module and show the views of section 6.
 - [`scripts/make_figures.py`](../scripts/make_figures.py) writes the two temperature figures:
 [`figures/temperature_lambda.png`](figures/temperature_lambda.png) and
