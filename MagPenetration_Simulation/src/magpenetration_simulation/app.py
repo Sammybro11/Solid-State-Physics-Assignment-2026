@@ -25,6 +25,8 @@ VIEWS = {
     "cylinder": views.cylinder.render,
     "combined": views.combined.render,
     "sphere": views.sphere.render,
+    "finite_body": views.finite_body.render,
+    "film": views.film.render,
 }
 
 

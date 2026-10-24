@@ -27,12 +27,29 @@ from magpenetration_simulation.cylinder import (
     cylinder_field_profile,
     cylinder_mean_field,
 )
+from magpenetration_simulation.film import (
+    film_parallel_center_field,
+    film_parallel_mean_field,
+    film_regime,
+    pearl_ratio,
+)
+from magpenetration_simulation.finite_body import (
+    rect_center_field,
+    rect_edge_distance,
+    rect_field_finite_difference,
+)
 from magpenetration_simulation.slab import (
     _grid,
     slab_field_analytic,
     slab_field_finite_difference,
     slab_field_relaxation,
     slab_field_shooting,
+)
+from magpenetration_simulation.sphere import (
+    sphere_center_field,
+    sphere_equator_field,
+    sphere_mean_field,
+    sphere_screening_factor,
 )
 from magpenetration_simulation.temperature import (
     clamp_temperature,
@@ -65,6 +82,27 @@ WALL_TOL = 1e-12              # surface field must equal B0
 SCALED_TOL = 1e-12            # scaled Bessel forms vs direct ratios
 WALL_FORM_TOL = 1e-3          # near-wall approximation
 WALL_FORM_S = (0.5, 1.0, 2.0)
+
+# Sphere, finite-body, and film acceptance values, as B/B0 ratios unless noted
+SPHERE_CENTER_5 = 0.06738252915
+SPHERE_EQUATOR_29 = 1.15797625286
+SPHERE_SCREEN_50 = 0.9412
+SPHERE_TOL = 1e-6
+SPHERE_SCREEN_TOL = 1e-4
+RECT_N = 81                    # grid points per side for the 2D solves
+RECT_SPECS = (                 # width/lambda, height/lambda, centre B/B0
+    (20.0, 5.0, 0.1631508352),
+    (5.0, 5.0, 0.2573616334),
+    (20.0, 1.0, 0.886820218),
+)
+RECT_CENTER_TOL = 1e-4
+RECT_RESIDUAL_TOL = 1e-9       # residual / (B0 / lambda**2)
+RECT_SLAB_RDIFF = 1e-3         # wide rectangle vs the 1D slab limit
+FILM_CASES = (                 # d/lambda, Lambda/lambda, regime
+    (2.0, 1.0, "crossover"),
+    (1.0, 2.0, "pearl"),
+    (10.0, 0.2, "thick"),
+)
 
 # Temperature defaults (SI units), separate from the slab defaults above
 TC = 9.2                 # K
@@ -247,6 +285,75 @@ def geometry_comparison_figure(path):
     plt.close(fig)
 
 
+def sphere_figure(path):
+    """Centre, mean, and equator B/B0 against R/lambda on linear axes."""
+    x = np.linspace(0.5, 20.0, 200)
+    center = np.array([sphere_center_field(xi * LAM, LAM, B0) for xi in x]) / B0
+    mean = np.array([sphere_mean_field(xi * LAM, LAM, B0) for xi in x]) / B0
+    equator = np.array([sphere_equator_field(xi * LAM, LAM, B0) for xi in x]) / B0
+    fig, ax = plt.subplots(figsize=(7, 4.2), layout="constrained")
+    ax.plot(x, center, color="#2563eb", lw=2, label="Centre")
+    ax.plot(x, mean, color="#059669", lw=2, label=r"Mean $\langle B_z\rangle$")
+    ax.plot(x, equator, color="#b91c1c", lw=2, ls="--", label="Equator")
+    ax.axvline(SIZE, color="#64748b", ls=":", lw=1.2, label=rf"$R = {SIZE:g}\lambda$")
+    ax.set_xlim(x[0], x[-1])
+    ax.set_ylim(0, 1.6)
+    ax.set_xlabel(r"$R/\lambda$")
+    ax.set_ylabel(r"$B/B_0$")
+    tidy(ax)
+    ax.set_title(rf"Sphere field ratios, $\lambda = {LAM * 1e9:g}$ nm", fontsize=11)
+    ax.legend(frameon=False, loc="center right", fontsize=9)
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+
+
+def finite_body_figure(path):
+    """B/B0 map of a 5 lambda square, with the 3 lambda valid-zone band marked."""
+    w = h = SIZE * LAM
+    sol = rect_field_finite_difference(w, h, LAM, B0, nx=RECT_N, ny=RECT_N)
+    xt, yt = sol.x / LAM, sol.y / LAM
+    xg, yg = np.meshgrid(sol.x, sol.y)
+    # Distance to the nearest edge, and the band where the 1D slab limit fails.
+    edge = rect_edge_distance(xg, yg, w, h) / LAM
+    fig, ax = plt.subplots(figsize=(7, 4.2), layout="constrained")
+    im = ax.pcolormesh(xt, yt, sol.b / B0, cmap="viridis", shading="auto", vmin=0)
+    ax.set_aspect("equal")
+    ax.contour(xt, yt, edge, levels=[3.0], colors="#f8fafc", linestyles="--", linewidths=1.4)
+    ax.plot([], [], color="#f8fafc", ls="--", lw=1.4, label=r"$3\lambda$ valid-zone edge")
+    if not bool((edge >= 3.0).any()):
+        ax.text(0.02, 0.02, r"no point is $3\lambda$ from every edge at $5\lambda \times 5\lambda$",
+                transform=ax.transAxes, fontsize=8, color="#f8fafc")
+    ax.set_xlim(xt[0], xt[-1])
+    ax.set_ylim(yt[0], yt[-1])
+    ax.set_xlabel(r"$x/\lambda$")
+    ax.set_ylabel(r"$y/\lambda$")
+    ax.set_title(rf"Finite body B/B0, ${SIZE:g}\lambda \times {SIZE:g}\lambda$, "
+                 rf"$N = {RECT_N}$", fontsize=11)
+    ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.16), fontsize=9)
+    fig.colorbar(im, ax=ax, label=r"$B/B_0$", shrink=0.9)
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+
+
+def film_figure(path):
+    """Pearl ratio Lambda/lambda = 2/(d/lambda) against d/lambda, with the crossover."""
+    d = np.linspace(0.1, 10.0, 400)
+    fig, ax = plt.subplots(figsize=(7, 4.2), layout="constrained")
+    ax.plot(d, 2.0 / d, color="#2563eb", lw=2, label=r"$\Lambda/\lambda = 2/(d/\lambda)$")
+    ax.axvline(2.0, color="#64748b", ls=":", lw=1.2, label=r"crossover $d = 2\lambda$")
+    ax.plot([2.0], [1.0], "o", color="#b91c1c", ms=7, zorder=3,
+            label=r"$\Lambda = \lambda$")
+    ax.set_xlim(d[0], d[-1])
+    ax.set_ylim(0, 5)
+    ax.set_xlabel(r"$d/\lambda$")
+    ax.set_ylabel(r"$\Lambda/\lambda$")
+    tidy(ax)
+    ax.set_title(rf"Pearl length vs film thickness, $\lambda = {LAM * 1e9:g}$ nm", fontsize=11)
+    ax.legend(frameon=False, loc="upper right", fontsize=9)
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+
+
 def geometry_checks():
     """Return the labels of every geometry check that leaves its bound."""
     x_5, x_20, x_50 = 5.0, 20.0, 50.0
@@ -293,6 +400,58 @@ def geometry_checks():
     compare(f"scaled field vs direct ratios, R/lambda = {x:g}",
             cylinder_field_analytic(0.5 * x * LAM, x * LAM, LAM, B0) / B0,
             i0(0.5 * x) / i0(x), SCALED_TOL)
+
+    return failed
+
+
+def geometry_model_checks():
+    """Return the labels of every sphere, finite-body, and film check that leaves its bound."""
+    failed = []
+
+    def compare(label, value, target, tol):
+        ok = bool(abs(value - target) <= tol)
+        print(f"{label:<46}{value:>20.10g}{target:>20.10g}   {'pass' if ok else 'FAIL'}")
+        if not ok:
+            failed.append(label)
+
+    def compare_text(label, value, target):
+        ok = value == target
+        print(f"{label:<46}{value:>20}{target:>20}   {'pass' if ok else 'FAIL'}")
+        if not ok:
+            failed.append(label)
+
+    x_5, x_29, x_50 = 5.0, 2.9, 50.0
+    print(f"Sphere/finite-body/film defaults: lambda = {LAM * 1e9:g} nm, "
+          f"B0 = {B0 * 1e3:g} mT, rectangle N = {RECT_N}")
+    print(f"{'Check':<46}{'value':>20}{'expected':>20}   result")
+    compare(f"sphere centre, R = {x_5:g} lambda", sphere_center_field(x_5 * LAM, LAM, B0) / B0,
+            SPHERE_CENTER_5, SPHERE_TOL)
+    compare(f"sphere equator, R = {x_29:g} lambda", sphere_equator_field(x_29 * LAM, LAM, B0) / B0,
+            SPHERE_EQUATOR_29, SPHERE_TOL)
+    compare(f"sphere screening factor, R = {x_50:g} lambda",
+            sphere_screening_factor(x_50 * LAM, LAM, B0), SPHERE_SCREEN_50, SPHERE_SCREEN_TOL)
+
+    scale = B0 / LAM**2
+    for width, height, target in RECT_SPECS:
+        sol = rect_field_finite_difference(width * LAM, height * LAM, LAM, B0,
+                                           nx=RECT_N, ny=RECT_N)
+        centre = rect_center_field(sol) / B0
+        compare(f"finite body centre, {width:g} x {height:g} lambda", centre, target,
+                RECT_CENTER_TOL)
+        compare(f"finite-body residual / (B0/lambda^2), {width:g} x {height:g} lambda",
+                sol.residual / scale, 0.0, RECT_RESIDUAL_TOL)
+    compare(f"wide rectangle vs slab analytic, d = {x_5:g} lambda",
+            abs(RECT_SPECS[0][2] - SLAB_CENTER_5) / SLAB_CENTER_5, 0.0, RECT_SLAB_RDIFF)
+
+    for d_ratio, ratio, regime in FILM_CASES:
+        compare(f"film Lambda/lambda, d = {d_ratio:g} lambda", pearl_ratio(LAM, d_ratio * LAM),
+                ratio, VALUE_TOL)
+        compare_text(f"film regime, d = {d_ratio:g} lambda", film_regime(LAM, d_ratio * LAM),
+                     regime)
+    compare(f"film parallel centre, d = {x_5:g} lambda",
+            film_parallel_center_field(x_5 * LAM, LAM, B0) / B0, SLAB_CENTER_5, VALUE_TOL)
+    compare(f"film parallel mean, d = {x_5:g} lambda",
+            film_parallel_mean_field(x_5 * LAM, LAM, B0) / B0, SLAB_MEAN_5, VALUE_TOL)
 
     return failed
 
@@ -353,13 +512,24 @@ def main():
     print(f"Wrote {FIG_DIR / 'geometry_cylinder.png'}")
     print(f"Wrote {FIG_DIR / 'geometry_comparison.png'}")
 
+    print()
+    model_failed = geometry_model_checks()
+    sphere_figure(FIG_DIR / "geometry_sphere.png")
+    finite_body_figure(FIG_DIR / "geometry_finite_body.png")
+    film_figure(FIG_DIR / "geometry_film.png")
+    print(f"Wrote {FIG_DIR / 'geometry_sphere.png'}")
+    print(f"Wrote {FIG_DIR / 'geometry_finite_body.png'}")
+    print(f"Wrote {FIG_DIR / 'geometry_film.png'}")
+
     if failed:
         print(f"FAIL: {', '.join(failed)} above the {TARGET:g} target", file=sys.stderr)
     if guard_failed:
         print(f"FAIL: {', '.join(guard_failed)} outside bound", file=sys.stderr)
     if geom_failed:
         print(f"FAIL: {', '.join(geom_failed)} outside bound", file=sys.stderr)
-    if failed or guard_failed or geom_failed:
+    if model_failed:
+        print(f"FAIL: {', '.join(model_failed)} outside bound", file=sys.stderr)
+    if failed or guard_failed or geom_failed or model_failed:
         sys.exit(1)
     print(f"All three methods within the {TARGET:g} target.")
     print("Temperature guards within bound.")

@@ -145,20 +145,23 @@ def render(material):
                 "modified spherical Bessel function i₁."
             )
             st.markdown(
-                "The Sphere page reports this vector solution only. It draws "
-                "no profile yet, and the next geometry slice will add one."
+                "The Sphere page plots the equatorial radial profile and the "
+                "surface field against latitude."
             )
             st.markdown("**Finite bodies**")
             st.markdown(
                 "A box, a rectangle, or a disk has no closed London solution. "
-                "This geometry needs a numeric solve over the sample and its "
-                "surroundings."
+                "This geometry needs a numeric solve."
             )
             st.markdown(
                 "Near an edge the screening current turns, and the one-"
                 "dimensional forms fail. A corner peak depends on the grid "
                 "size, not on the sample. Only an ellipsoid has an exact "
                 "demagnetizing factor."
+            )
+            st.markdown(
+                "The Finite body page solves a rectangle on a 2D grid with "
+                "Dirichlet edges and marks the interior valid zone."
             )
             st.markdown("**Thin film**")
             st.markdown(
@@ -190,13 +193,15 @@ def render(material):
         st.markdown(
             "The **Slab** page plots the analytic profile, the temperature "
             "family, and a thin-film warning for d < 2λ. The **Cylinder** page "
-            "plots the Bessel profile over the R/λ family. The **Combined** "
-            "page puts the slab and the cylinder on one depth axis, measured "
-            "from the nearest face. The **Sphere** page reports the exact "
-            "vector solution."
+            "plots the Bessel profile over the R/λ family. The **Sphere** page "
+            "plots the equatorial profile and the surface field. The **Finite "
+            "body** page maps a 2D rectangle with a valid-zone mask. The "
+            "**Film** page shows the Pearl length and the parallel-field film "
+            "profile. The **Combined** page compares all five geometries at one "
+            "common size."
         )
         st.markdown(
-            "The navigation bar at the top of the window shows all six pages. "
+            "The navigation bar at the top of the window shows all eight pages. "
             "Select a name there to change page."
         )
 

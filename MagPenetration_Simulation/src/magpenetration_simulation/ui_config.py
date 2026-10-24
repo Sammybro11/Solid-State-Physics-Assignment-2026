@@ -13,19 +13,30 @@ SIDEBAR = {
     "b_0": {"min": 10, "max": 500, "default": 50, "step": 10},
 }
 TEMPERATURE = {"clamp_factor": 0.995}
-GRID = {"min": 41, "max": 2001, "default": 401, "step": 20}
+GRID = {"min": 41, "max": 1001, "default": 401, "step": 20}
 METHODS = {
-    "d_over_lam": {"min": 0.5, "max": 100.0, "default": 5.0, "step": 0.5},
+    "d_over_lam": {"min": 0.5, "max": 20.0, "default": 5.0, "step": 0.5},
     "target": 1e-3,
 }
 SLAB = {
-    "d_over_lam": {"min": 0.5, "max": 100.0, "default": 5.0, "step": 0.5},
+    "d_over_lam": {"min": 0.5, "max": 20.0, "default": 5.0, "step": 0.5},
 }
 # near_wall_min and near_wall_clip set when the thick-cylinder limit is drawn.
 CYLINDER = {
     "size": {"min": 0.5, "max": 20.0, "default": 5.0, "step": 0.5},
     "near_wall_min": 10.0,
     "near_wall_clip": 1.02,
+}
+SPHERE = {
+    "size": {"min": 0.5, "max": 20.0, "default": 5.0, "step": 0.5},
+}
+FINITE_BODY = {
+    "width": {"min": 0.5, "max": 20.0, "default": 5.0, "step": 0.5},
+    "height": {"min": 0.5, "max": 20.0, "default": 5.0, "step": 0.5},
+    "n": {"min": 41, "max": 201, "default": 81, "step": 20},
+}
+FILM = {
+    "thickness": {"min": 0.1, "max": 10.0, "default": 1.0, "step": 0.1},
 }
 COMBINED = {
     "size": {"min": 0.5, "max": 20.0, "default": 5.0, "step": 0.5},
@@ -47,6 +58,8 @@ PAGES = (
     ("methods", "Methods"),
     ("slab", "Slab"),
     ("cylinder", "Cylinder"),
-    ("combined", "Combined"),
     ("sphere", "Sphere"),
+    ("finite_body", "Finite body"),
+    ("film", "Film"),
+    ("combined", "Combined"),
 )
